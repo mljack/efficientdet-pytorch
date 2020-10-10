@@ -13,6 +13,7 @@ import torch
 import numpy as np
 from PIL import Image
 from pycocotools.coco import COCO
+import cv2
 
 
 class CocoDetection(data.Dataset):
@@ -131,3 +132,34 @@ class CocoDetection(data.Dataset):
 
     def __len__(self):
         return len(self.img_ids)
+
+
+class MyDetection(data.Dataset):
+    def __init__(self, root, transform=None):
+        super(MyDetection, self).__init__()
+        if isinstance(root, torch._six.string_classes):
+            root = os.path.expanduser(root)
+        self.root = root
+        self.transform = transform
+        self.img_names = list(os.listdir(root))
+        self.img_ids = list(range(len(self.img_names)))
+        #self.img_infos = [os.path.join(root, item) for item in self.img_ids]
+
+    def __getitem__(self, index):
+        img_id = self.img_ids[index]
+        path = os.path.join(self.root,  self.img_names[img_id])
+        img = Image.open(path).convert('RGB')
+        ann = dict(img_id=img_id, img_size=(img.size[0], img.size[1]))
+        if self.transform is not None:
+            img, ann = self.transform(img, ann)
+
+        return img, ann
+
+    def __len__(self):
+        return len(self.img_ids)
+        
+    def get_img(self, index):
+        img_id = self.img_ids[index]
+        path = os.path.join(self.root,  self.img_names[img_id])
+        img = Image.open(path).convert('RGB')
+        return cv2.cvtColor(np.array(img), cv2.COLOR_BGR2RGB)

@@ -135,3 +135,7 @@ dmypy.json
 *.tar
 *.pth
 *.gz
+*.png
+*.jpg
+*.txt
+/drone
