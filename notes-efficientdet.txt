@@ -1,0 +1,34 @@
+install
+=================================================================
+download NVIDIA
+download conda
+download efficientdet-pytorch form http://git.51vr.local/experimental/efficientdet-pytorch
+start up anaconda prompt, execute
+	conda create --name efficientdet-pytorch python=3.7
+	conda activate efficientdet-pytorch
+	conda install pytorch torchvision cudatoolkit=10.1 -c pytorch
+	pip install -r requirements.txt
+	conda install -c conda-forge nvidia-apex
+	conda install -c conda-forge opencv
+	conda install -c conda-forge albumentations
+	conda install -c conda-forge jupyterlab
+	conda install -c anaconda pandas
+	conda install -c anaconda scikit-learny
+	pip install ensemble-boxes
+	conda install -c anaconda flask
+	conda install -c conda-forge flask-restful
+	conda install -c anaconda requests
+=====================================================================
+test
+=====================================================================
+start up anaconda prompt 
+	conda activate efficientdet-pytorch
+switch to the installed disk
+execute 
+	cd efficientdet-pytorch
+	jupyter notebook
+Put training pictures into a folder (E:\efficientdet-pytorch\drone\xxx)，the name of the folder can't use chinese
+E:\efficientdet-pytorch\drone>python generate_train_test_set.py 123
+open the finetune-drone-train.ipynb adnd execute
+Put testing pictures into (E:\efficientdet-pytorch\drone\test)
+open the finetune-drone-test.ipynb adnd execute
