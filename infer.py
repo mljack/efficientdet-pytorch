@@ -16,18 +16,21 @@ from matplotlib import pyplot as plt
 from effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
 from effdet.efficientdet import HeadNet
 
+import warnings
+warnings.simplefilter("ignore")
+
 def get_valid_transforms():
     return A.Compose([
-            A.Resize(height=512, width=512, p=1.0),
+            A.Resize(height=image_scale, width=image_scale, p=1.0),
             ToTensorV2(p=1.0),
         ], p=1.0)
 
 def load_net(checkpoint_path):
-    config = get_efficientdet_config('tf_efficientdet_d2')
+    config = get_efficientdet_config(model_name)
     net = EfficientDet(config, pretrained_backbone=False)
 
     config.num_classes = 1
-    config.image_size=512
+    config.image_size = image_scale
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
     checkpoint = torch.load(checkpoint_path)
@@ -61,15 +64,13 @@ def make_predictions(images, net, score_threshold=0.22):
             })
     return [predictions]
 
-def run_wbf(predictions, image_index, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
+def run_wbf(predictions, image_index, image_size, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     boxes = [(prediction[image_index]['boxes']/(image_size-1)).tolist()  for prediction in predictions]
     scores = [prediction[image_index]['scores'].tolist()  for prediction in predictions]
     labels = [np.ones(prediction[image_index]['scores'].shape[0]).tolist() for prediction in predictions]
     boxes, scores, labels = weighted_boxes_fusion(boxes, scores, labels, weights=None, iou_thr=iou_thr, skip_box_thr=skip_box_thr)
     boxes = boxes*(image_size-1)
     return boxes, scores, labels
-
-net = load_net('effdet-d2-drone_3_512_1024_bs8_epoch32/best-checkpoint-005epoch.bin')
 
 class DatasetRetriever(Dataset):
     def __init__(self, crop_size, overlap_size, path=None, img_bytes=None, np_img=None, transform=None):
@@ -95,7 +96,7 @@ class DatasetRetriever(Dataset):
         self.idx_w = 0
         self.idx_h = 0
         self.step = crop_size - overlap_size
-        self.bbox_scale = float(crop_size) / 512.0
+        self.bbox_scale = float(crop_size) / float(image_scale)
         
         #print(self.width, self.height)
         #print(self.count_w, self.count_h)
@@ -132,11 +133,10 @@ class DatasetRetriever(Dataset):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
-def predict(path = None, img_bytes = None, np_img = None):
-    dataset = DatasetRetriever(512, 200, path=path, img_bytes=img_bytes, np_img=np_img, transform=get_valid_transforms())
-    data_loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=0, drop_last=False, collate_fn=collate_fn)
+def predict(path = None, img_bytes = None, np_img = None, delay = 1):
+    dataset = DatasetRetriever(image_scale, overlap_size, path=path, img_bytes=img_bytes, np_img=np_img, transform=get_valid_transforms())
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0, drop_last=False, collate_fn=collate_fn)
 
-    show_img = False
     if show_img:
         img2 = np_img if path is None else cv2.imread(path, cv2.IMREAD_COLOR)
         color = [(255, 0, 0), (0, 255, 0),(0, 0, 255),(255, 255, 0),(255, 0, 255),(0, 255, 255), (0,0,0)]
@@ -170,15 +170,41 @@ def predict(path = None, img_bytes = None, np_img = None):
             start_point = (int(bbox[0]), int(bbox[1])) 
             end_point = (int(bbox[2]), int(bbox[3])) 
             img2 = cv2.rectangle(img2, start_point, end_point, color[obj["crop_idx"]%len(color)], 2)
-        cv2.imwrite("save.png", img2)
+        if save_img:
+            cv2.imwrite("save1.png", img2)
         cv2.namedWindow("result", cv2.WINDOW_NORMAL);
         cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN);
         cv2.imshow("result", img2)
-        k = cv2.waitKey()
+        k = cv2.waitKey(delay)
+        #exit(0)
         if k == 27:
             exit(0)
 
     return results
+
+show_img = True
+save_img = True
+save_result = True
+if 0:
+    image_scale = 512
+    overlap_size = 200
+    batch_size = 64
+    model_name = 'tf_efficientdet_d2'
+    net = load_net('effdet-d2-drone_003_512_1024_bs8_epoch32/best-checkpoint-005epoch.bin')
+if 0:
+    image_scale = 896
+    overlap_size = 200
+    batch_size = 8
+    model_name = 'tf_efficientdet_d3'
+    net = load_net('effdet-d3-drone_004_896_1792_bs2_epoch6/best-checkpoint-000epoch.bin')
+    #net = load_net('effdet-d3-drone_004_896_1792_bs2_epoch6/last-checkpoint.bin')
+if 1:
+    image_scale = 768
+    overlap_size = 200
+    batch_size = 32
+    model_name = 'tf_efficientdet_d2'
+    net = load_net('effdet-d2-drone_005_768_1536_bs4_epoch6/best-checkpoint-000epoch.bin')
+    #net = load_net('effdet-d2-drone_005_768_1536_bs4_epoch6/last-checkpoint.bin')
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -188,12 +214,14 @@ if __name__ == '__main__':
         ext = path[path.rfind(".")+1:]
         if ext.lower() in ("png", "jpg", "jpeg", "bmp"):
             start = time.time()
-            result = predict(path)
+            result = predict(path, delay=0)
             print(time.time() - start)
+            if save_result:
+                with open(path[0:path.rfind(".")]+".vehicles.json", "w") as f:
+                    #json.dump(result, f, indent=4)
+                    json.dump(result, f)
         elif ext.lower() in ("mpg", "mpeg", "mov", "mp4"):
             torch.backends.cudnn.benchmark = True
-            import warnings
-            warnings.simplefilter("ignore")
             video = cv2.VideoCapture(path)
             fps = video.get(cv2.CAP_PROP_FPS)
             print("FPS:\t\t%6.2f" % fps)
@@ -207,15 +235,13 @@ if __name__ == '__main__':
                 has_frame, img = video.read()
                 if not has_frame:
                     break
-                if count < 300:
-                    count += 1
-                    continue
                 start = time.time()
                 result = predict(np_img = img)
                 print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
                 #print(result)
-                with open(os.path.join(base, "%05d.json" % count), "w") as f:
-                    #json.dump(result, f, indent=4)
-                    json.dump(result, f)
+                if save_result:
+                    with open(os.path.join(base, "%05d.json" % count), "w") as f:
+                        #json.dump(result, f, indent=4)
+                        json.dump(result, f)
                 count += 1
 
