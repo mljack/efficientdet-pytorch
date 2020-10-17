@@ -1,8 +1,10 @@
-install
+=================================================================
+Install
 =================================================================
 download NVIDIA
 download conda
-download efficientdet-pytorch form http://git.51vr.local/experimental/efficientdet-pytorch
+git clone http://git.51vr.local/experimental/efficientdet-pytorch
+git clone http://git.51vr.local/experimental/albumentations
 start up anaconda prompt, execute
 	conda create --name efficientdet-pytorch python=3.7
 	conda activate efficientdet-pytorch
@@ -15,11 +17,17 @@ start up anaconda prompt, execute
 	conda install -c anaconda pandas
 	conda install -c anaconda scikit-learny
 	pip install ensemble-boxes
+
+	conda remove albumentations --force
+	cd albumentations
+	pip install -e .
+	pip uninstall opencv-python-headless
+
 	conda install -c anaconda flask
 	conda install -c conda-forge flask-restful
 	conda install -c anaconda requests
 =====================================================================
-test
+Train/Test
 =====================================================================
 start up anaconda prompt 
 	conda activate efficientdet-pytorch

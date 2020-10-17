@@ -161,7 +161,7 @@ def predict(path = None, img_bytes = None, np_img = None, delay = 1):
                     if show_img:
                         obj["crop_idx"] = crop_idx[i]
                     results.append(obj)
-            if show_img:
+            if show_img and box_color is None:
                 img2 = cv2.rectangle(img2, (base_x[i]+120, base_y[i]+120), (base_x[i]+dataset.crop_size-120, base_y[i]+dataset.crop_size-120), color[crop_idx[i]%len(color)], 3)
 
     if show_img:
@@ -169,9 +169,10 @@ def predict(path = None, img_bytes = None, np_img = None, delay = 1):
             bbox = obj["box"]
             start_point = (int(bbox[0]), int(bbox[1])) 
             end_point = (int(bbox[2]), int(bbox[3])) 
-            img2 = cv2.rectangle(img2, start_point, end_point, color[obj["crop_idx"]%len(color)], 2)
+            c = color[obj["crop_idx"]%len(color)] if box_color is None else box_color
+            img2 = cv2.rectangle(img2, start_point, end_point, c, 2)
         if save_img:
-            cv2.imwrite("save1.png", img2)
+            cv2.imwrite(img_name, img2)
         cv2.namedWindow("result", cv2.WINDOW_NORMAL);
         cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN);
         cv2.imshow("result", img2)
@@ -182,9 +183,15 @@ def predict(path = None, img_bytes = None, np_img = None, delay = 1):
 
     return results
 
+box_color = None
 show_img = True
-save_img = True
-save_result = True
+save_img = False
+img_name = "save_16.png"
+save_result = False
+#box_color = (0,0,255)
+#box_color = (0,255,0)
+#box_color = (0,255,255)
+
 if 0:
     image_scale = 512
     overlap_size = 200
@@ -203,8 +210,13 @@ if 1:
     overlap_size = 200
     batch_size = 32
     model_name = 'tf_efficientdet_d2'
-    net = load_net('effdet-d2-drone_005_768_1536_bs4_epoch6/best-checkpoint-000epoch.bin')
+    #net = load_net('effdet-d2-drone_005_768_1536_bs4_epoch6/best-checkpoint-000epoch.bin')
     #net = load_net('effdet-d2-drone_005_768_1536_bs4_epoch6/last-checkpoint.bin')
+    #net = load_net('effdet-d2-drone_006_768_1536_rotated_obb_no_cutout_bs2_epoch3/best-checkpoint-002epoch.bin')
+    #net = load_net('effdet-d2-drone_007_768_1536_rotated_obb_no_cutout_more_bus_bs4_epoch4/best-checkpoint-003epoch.bin')
+    net = load_net('effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-015epoch.bin')
+    #net = load_net('effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-005epoch.bin')
+    
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -229,12 +241,15 @@ if __name__ == '__main__':
             base = path.replace("."+ext, "")+"_objs"
             if not os.path.isdir(base):
                 os.mkdir(base)
-            count = 0
+            count = -1
             has_frame = True
             while has_frame:
+                count += 1
                 has_frame, img = video.read()
                 if not has_frame:
                     break
+                #if count < 150:
+                #    continue
                 start = time.time()
                 result = predict(np_img = img)
                 print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
@@ -243,5 +258,4 @@ if __name__ == '__main__':
                     with open(os.path.join(base, "%05d.json" % count), "w") as f:
                         #json.dump(result, f, indent=4)
                         json.dump(result, f)
-                count += 1
 
