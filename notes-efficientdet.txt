@@ -23,6 +23,11 @@ start up anaconda prompt, execute
 	pip install -e .
 	pip uninstall opencv-python-headless
 
+	pip install torch-lr-finder
+
+	conda install -c conda-forge --no-deps shapely
+	conda install -c conda-forge jupyterlab
+
 	conda install -c anaconda flask
 	conda install -c conda-forge flask-restful
 	conda install -c anaconda requests
