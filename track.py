@@ -16,7 +16,6 @@ def IoU(b1, b2):
         return 0.0
     intersection_area = (intersection[2] - intersection[0]) * (intersection[3] - intersection[1])
     union_area = (b1[2] - b1[0]) * (b1[3] - b1[1]) + (b2[2] - b2[0]) * (b2[3] - b2[1]) - intersection_area
-    #print(intersection_area, union_area)
     return intersection_area / union_area
 
 def IoU_poly(obj1, obj2):
@@ -28,16 +27,22 @@ def IoU_poly(obj1, obj2):
     intersection_area = obj1.poly.intersection(obj2.poly).area
     if intersection_area == 0.0:
         return 0.0
-    return intersection_area / obj1.poly.intersection(obj2.poly).area
+    return intersection_area / obj1.poly.union(obj2.poly).area
 
 class Obj:
-    def __init__(self, obj_json):
+    def __init__(self, id, obj_json):
         self.json = obj_json
         box = obj_json["box"]
+        self.detection_id = id
         self.box = box
-        self.poly = Polygon([(box[0],box[1]), (box[2],box[1]), (box[2],box[3]), (box[0],box[3])])
+        if "polygon" in obj_json.keys():
+            pts = obj_json["polygon"]
+        else:
+            pts = [[box[0], box[1]], [box[0], box[3]], [box[2], box[3]], [box[2], box[1]]]
+        self.poly = Polygon(pts)
         self.radius = max(abs(box[2]-box[0]), abs(box[3]-box[1]))
-        self.p = ((box[0] + box[2]) * 0.5, (box[1] + box[3]) * 0.5)
+        self.p = ((pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) * 0.25,
+            (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) * 0.25)
         self.track_id = None
         self.next_objs = []
         self.next_obj_ious = []
@@ -46,8 +51,8 @@ class Frame:
     def __init__(self, path):
         with open(path) as f:
             self.objs = []
-            for obj_json in json.load(f):
-                self.objs.append(Obj(obj_json))
+            for idx, obj_json in enumerate(json.load(f)):
+                self.objs.append(Obj(idx, obj_json))
 
 def dist(a, b):
     return math.sqrt((a.p[0]-b.p[0])*(a.p[0]-b.p[0]) + (a.p[1]-b.p[1])*(a.p[1]-b.p[1]))
@@ -60,7 +65,6 @@ def max_IoU_obj(obj_a, objs):
         if iou > max_IoU:
             max_IoU = iou
             max_IoU_obj = obj_b
-            #print(iou)
     #print(max_IoU)
     return max_IoU_obj, max_IoU
 
@@ -85,19 +89,37 @@ def track(base_path, video_path):
         out_video = cv2.VideoWriter(out_video_path,cv2.VideoWriter_fourcc('a', 'v', 'c', '1'), fps, (frame_w,frame_h))
         print(out_video_path)
 
+    img = None
     frame_id = -1
     files = sorted(os.listdir(base_path))
     for item in files:
         if item.find(".json") == -1:
             continue
 
-        start = time.time()
+        tokens = item.replace(".json", "").split("_")
+        json_frame_id = int(tokens[0])
+        angle = int(tokens[1]) if len(tokens) > 1 else 0
+        #if angle != 0:
+        #    continue
 
-        json_frame_id = int(item.replace(".json", ""))
+        #if img is not None:
+        if img is not None and angle == 0:
+            cv2.namedWindow("result", cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty("result",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+            cv2.imshow("result", img)
+            #cv2.imwrite("saved.png", img)
+            #exit(0)
+            k = cv2.waitKey(1)
+            if k == 27:
+                #exit(0)
+                break
+
+        start = time.time()
         if video_path is not None:
-            while json_frame_id != frame_id:
-                _, img = video.read()
+            while json_frame_id != frame_id or video_img is None:
+                _, video_img = video.read()
                 frame_id += 1
+            img = video_img#.copy()
 
         json_path = os.path.join(base_path, item)
         frames.append(Frame(json_path))
@@ -132,13 +154,14 @@ def track(base_path, video_path):
             obj.next_objs = [selected_obj]
             obj.next_obj_ious = [max_iou]
 
-        # save to json
-        frame_json = []
-        for obj in objs2:
-            obj.json["obj_id"] = obj.track_id
-            frame_json.append(obj.json)
-        with open(json_path, 'w') as f:
-            json.dump(frame_json, f, indent=4)
+        if 0:
+            # save to json
+            frame_json = []
+            for obj in objs2:
+                obj.json["obj_id"] = obj.track_id
+                frame_json.append(obj.json)
+            with open(json_path, 'w') as f:
+                json.dump(frame_json, f, indent=4)
 
         if 0:
             max_dist = 0
@@ -178,21 +201,18 @@ def track(base_path, video_path):
         if video_path is not None:
             for obj in objs2:
                 c = color[obj.track_id % len(color)]
-                img = cv2.rectangle(img, (int(obj.box[0]), int(obj.box[1])), (int(obj.box[2]), int(obj.box[3])), c, 3)
+
+                pts =[]
+                for x,y in obj.poly.exterior.coords:
+                    pts.append((x,y))
+                pts = np.int32(np.array(pts))
+                img = cv2.drawContours(img, [pts], 0, c, 3)
+                #img = cv2.fillPoly(img, [cd], (255,0,0))
+
+                #img = cv2.rectangle(img, (int(obj.box[0]), int(obj.box[1])), (int(obj.box[2]), int(obj.box[3])), c, 3)
             out_video.write(img)
 
-            if 1:
-                cv2.namedWindow("result", cv2.WND_PROP_FULLSCREEN)
-                cv2.setWindowProperty("result",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-                cv2.imshow("result", img)
-                #cv2.imwrite("saved.png", img)
-                #exit(0)
-                k = cv2.waitKey(1)
-                if k == 27:
-                    #exit(0)
-                    break
-
-        print("[%05d]: %.3fs" % (len(frames), time.time() - start))
+        print("[%05d]: %.3fs" % (json_frame_id, time.time() - start))
 
     if video_path is not None:
         out_video.release()
