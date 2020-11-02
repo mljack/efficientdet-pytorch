@@ -55,28 +55,37 @@ def IoU_refined_poly_vs_refined_poly(obj1, obj2, debug=False):
         print("C")
     return intersection_area / obj1.refined_poly.union(obj2.refined_poly).area
 
+class TrackedObj:
+    def __init__(self, obj):
+        self.track_id = None
+        self.next_objs = []
+        self.next_obj_ious = []
+        self.frames = collections.OrderedDict()
+        self.inactive_count = 0
+        self.refined_poly = None
+        self.discarded = False
+        self.angle_count = 1
+
+        self.p = obj.p
+        self.radius = obj.radius
+
 class Obj:
     def __init__(self, id, obj_json):
         self.json = obj_json
         box = obj_json["box"]
         self.detection_id = id
-        self.box = box
+        self.label = obj_json["label"]
+        self.score = obj_json["score"]
         if "polygon" in obj_json.keys():
             pts = obj_json["polygon"]
         else:
             pts = [[box[0], box[1]], [box[0], box[3]], [box[2], box[3]], [box[2], box[1]]]
+        self.box = pts
         self.poly = Polygon(pts)
         self.radius = max(abs(box[2]-box[0]), abs(box[3]-box[1]))
         self.p = ((pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) * 0.25,
             (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) * 0.25)
-        self.track_id = None
-        self.next_objs = []
-        self.next_obj_ious = []
-        self.frames = collections.OrderedDict()
-        self.matched = False
-        self.inactive_count = 0
-        self.refined_poly = None
-        self.discarded = False
+
 
 def load_objs(path):
     with open(path) as f:
@@ -112,6 +121,66 @@ def in_range(obj):
     #return obj.p[1] >= 1031 and obj.p[1] <= 1031+60 and obj.p[0] >= 3464 and obj.p[0] <= 3464+150
     #return obj.p[0] >= 1364 and obj.p[0] <= 1364+176 and obj.p[1] >= 1124 and obj.p[1] <= 1124+103
 
+def debug_print_objs(active_tracked_objs, inactive_tracked_objs, angle):
+    return
+
+    print("active_tracked_objs:")
+    for id, obj in active_tracked_objs.items():
+        if in_range(obj):
+            print("\t", id, list(obj.frames.keys()))
+            for key, angle_objs in obj.frames.items():
+                print("\t\t", key, list(angle_objs.keys()))
+    print("inactive_tracked_objs:")
+    for id, obj in inactive_tracked_objs.items():
+        if in_range(obj):
+            print("\t", id, list(obj.frames.keys()))
+            for key, angle_objs in obj.frames.items():
+                print("\t\t", key, list(angle_objs.keys()))
+    print("angle: ", angle)
+
+def debug_show_objs(json_frame_id, obj, img, active_tracked_objs, iou, angle):
+    if not in_range(obj):
+        return
+
+    print("iou", iou, json_frame_id, angle)
+
+    if json_frame_id >= 40:
+    #if json_frame_id == 17 and angle == 0:
+        c = [255, 255, 255]
+        pts =[]
+        for x,y in obj.poly.exterior.coords:
+            pts.append((x,y))
+        pts = np.int32(np.array(pts))
+        img = cv2.drawContours(img, [pts], 0, c, 1)
+
+        for obj2 in active_tracked_objs.values():
+            if in_range(obj2):
+                c = [0, 0, 0]
+                pts =[]
+                for x,y in obj2.refined_poly.exterior.coords:
+                    pts.append((x,y))
+                pts = np.int32(np.array(pts))
+                img = cv2.drawContours(img, [pts], 0, c, 1)
+
+                print(obj.p, obj2.p)
+                print(obj.box)
+                cv2.circle(img,(int(obj.p[1]), int(obj.p[0])), 2, (0,255,0), -1)
+                cv2.circle(img,(int(obj2.p[1]), int(obj2.p[0])), 2, (255,0,0), -1)
+                print(IoU_poly_vs_refined_poly(obj, obj2, debug=True))
+
+        #cv2.imshow("result", img)
+        #img2 = img[1124:1124+103, 1364:1364+176]
+        img2 = img[1000:1068+66, 2500:2609+179]
+
+        img2 = cv2.resize(img2, (img2.shape[1]*4, img2.shape[0]*4))
+        cv2.imshow("result", img2)
+        #cv2.imwrite("saved.png", img)
+        #exit(0)
+        k = cv2.waitKey(0)
+        if k == 27:
+            exit(0)
+            #break
+
 def track(base_path, video_path):
     track_count = 0
 
@@ -140,39 +209,29 @@ def track(base_path, video_path):
     json_frame_id_old = -1
     start = time.time()
     for item in files:
-        if item.find(".json") == -1:
+        if item.find(".json") == -1 or item.find(".tracked.json") != -1:
             continue
 
         tokens = item.replace(".json", "").split("_")
         json_frame_id = int(tokens[0])
         angle = int(tokens[1]) if len(tokens) > 1 else 0
         
+        #if angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
         if angle not in {0, 10, 20, 30, 40, 50, 60, 70, 80}:
-        #if angle not in {0, 15, 45, 60, 75}:
+        #if angle not in {0, 15, 30, 15, 60, 75}:
+        #if angle not in {0, 30, 60}:
+        #if angle not in {0}:
             continue
 
-        if 0:
-            print("active_tracked_objs:")
-            for id, obj in active_tracked_objs.items():
-                if in_range(obj):
-                    print("\t", id, list(obj.frames.keys()))
-                    for key, angle_objs in obj.frames.items():
-                        print("\t\t", key, list(angle_objs.keys()))
-            print("inactive_tracked_objs:")
-            for id, obj in inactive_tracked_objs.items():
-                if in_range(obj):
-                    print("\t", id, list(obj.frames.keys()))
-                    for key, angle_objs in obj.frames.items():
-                        print("\t\t", key, list(angle_objs.keys()))
-            print("angle: ", angle)
+        debug_print_objs(active_tracked_objs, inactive_tracked_objs, angle)
         
         is_new_frame = json_frame_id_old != -1 and json_frame_id_old != json_frame_id
         if is_new_frame:
-            print("[%05d]: %.3fs" % (json_frame_id, time.time() - start))
+            print("[%05d]: %.3fs" % (json_frame_id_old, time.time() - start))
             start = time.time()
-            
-            # Discard overlapped objs with less matched count
             discarded_track_ids = set()
+
+            # Mark objs with refined polygon overlapped as discarded
             max_iou3 = 0.0
             for idx_a, obj_a in enumerate(active_tracked_objs.values()):
                 if obj_a.track_id in discarded_track_ids:
@@ -183,31 +242,40 @@ def track(base_path, video_path):
                     iou3 = IoU_refined_poly_vs_refined_poly(obj_a, obj_b)
                     max_iou3 = max(max_iou3, iou3)
                     if iou3 > 0.2:
-                        #print("######## iou3: %f, %d(%d)[%s] vs %d(%d)[%s]" % (iou3, obj_a.track_id, len(obj_a.frames), str(obj_a.p), obj_b.track_id, len(obj_b.frames), str(obj_b.p)))
-                        if len(obj_a.frames) > len(obj_b.frames):
-                            #print("######## discard b", len(obj_b.frames))
+                        if len(obj_a.frames) > len(obj_b.frames):   # with less tracked frames
                             discarded_track_ids.add(obj_b.track_id)
                         elif len(obj_a.frames) < len(obj_b.frames):
-                            #print("######## discard a", len(obj_b.frames))
                             discarded_track_ids.add(obj_a.track_id)
-                        elif obj_a.refined_poly.area < obj_b.refined_poly.area:
-                            #print("######## discard b, area ", obj_b.refined_poly.area)
+                        elif obj_a.refined_poly.area < obj_b.refined_poly.area: # with larger refined polygon
                             discarded_track_ids.add(obj_b.track_id)
                         else:
-                            #print("######## discard a, area ", obj_a.refined_poly.area)
                             discarded_track_ids.add(obj_a.track_id)
-            #print("######### max_iou3: ", max_iou3)
 
+            # Save to json
+            frame_json = []
+            for obj in active_tracked_objs.values():
+                if json_frame_id_old not in obj.frames:
+                    continue
+                obj_json = {}
+                obj_json["obj_id"] = obj.track_id
+                if obj.track_id in discarded_track_ids:
+                    obj_json["discarded"] = True
+                obj_json["refined_polygon"] = [[x, y] for x,y in obj.refined_poly.exterior.coords]
+                obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
+                    "polygon":angle_obj.box} for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
+                frame_json.append(obj_json)
+            json_path = os.path.join(base_path, "%05d.tracked.json" % json_frame_id_old)
+            with open(json_path, 'w') as f:
+                json.dump(frame_json, f, indent=4)
+
+            # Move discarded tracks to inactive list
             for track_id in discarded_track_ids:
                 obj = active_tracked_objs[track_id]
                 obj.discarded = True
-                #print("############################# discard track ", track_id, obj.track_id)
                 inactive_tracked_objs[track_id] = obj
-                #print(list(active_tracked_objs.keys()))
                 del active_tracked_objs[track_id]
-                #print(list(active_tracked_objs.keys()))
 
-            # show results
+            # Show results
             #if 0:
             if video_path is not None:
                 for obj in active_tracked_objs.values():
@@ -217,24 +285,15 @@ def track(base_path, video_path):
                         pts.append((x,y))
                     pts = np.int32(np.array(pts))
                     img = cv2.drawContours(img, [pts], 0, c, 3)
-                #img = cv2.fillPoly(img, [cd], (255,0,0))
-                #img = cv2.rectangle(img, (int(obj.box[0]), int(obj.box[1])), (int(obj.box[2]), int(obj.box[3])), c, 3)
                 out_video.write(img)
 
                 cv2.namedWindow("result", cv2.WND_PROP_FULLSCREEN)
                 cv2.setWindowProperty("result",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
                 cv2.imshow("result", img)
-                #img2 = img[1124:1124+103, 1364:1364+176]
-                #img2 = cv2.resize(img2, (img2.shape[1]*4, img2.shape[0]*4))
-                #cv2.imshow("result", img2)
                 #cv2.imwrite("saved.png", img)
-                #exit(0)
                 k = cv2.waitKey(1)
                 if k == 27:
-                #    #exit(0)
                     break
-
-        json_frame_id_old = json_frame_id
 
         if video_path is not None:
             while json_frame_id != frame_id or video_img is None:
@@ -246,66 +305,21 @@ def track(base_path, video_path):
         objs = load_objs(json_path)
 
         new_tracks = []
-        for obj in active_tracked_objs.values():
-            obj.next_objs = []
-            obj.next_obj_ious = []
 
         # Track with IoU
         for obj in objs:
-            tracked_obj, iou = max_IoU_obj(obj, active_tracked_objs.values(), IoU_poly_vs_refined_poly)
+            matched_obj, iou = max_IoU_obj(obj, active_tracked_objs.values(), IoU_poly_vs_refined_poly)
+            debug_show_objs(json_frame_id, obj, img, active_tracked_objs, iou, angle)
 
-            if in_range(obj):
-                print("iou", iou, json_frame_id, angle)
-
-                if json_frame_id >= 40:
-                #if json_frame_id == 17 and angle == 0:
-                    c = [255, 255, 255]
-                    pts =[]
-                    for x,y in obj.poly.exterior.coords:
-                        pts.append((x,y))
-                    pts = np.int32(np.array(pts))
-                    img = cv2.drawContours(img, [pts], 0, c, 1)
-                    
-                    for obj2 in active_tracked_objs.values():
-                        if in_range(obj2):
-                            c = [0, 0, 0]
-                            pts =[]
-                            for x,y in obj2.refined_poly.exterior.coords:
-                                pts.append((x,y))
-                            pts = np.int32(np.array(pts))
-                            img = cv2.drawContours(img, [pts], 0, c, 1)
-                            
-                            print(obj.p, obj2.p)
-                            print(obj.box)
-                            cv2.circle(img,(int(obj.p[1]), int(obj.p[0])), 2, (0,255,0), -1)
-                            cv2.circle(img,(int(obj2.p[1]), int(obj2.p[0])), 2, (255,0,0), -1)
-                            print(IoU_poly_vs_refined_poly(obj, obj2, debug=True))
-
-                    #cv2.imshow("result", img)
-                    #img2 = img[1124:1124+103, 1364:1364+176]
-                    img2 = img[1000:1068+66, 2500:2609+179]
-                    
-                    img2 = cv2.resize(img2, (img2.shape[1]*4, img2.shape[0]*4))
-                    cv2.imshow("result", img2)
-                    #cv2.imwrite("saved.png", img)
-                    #exit(0)
-                    k = cv2.waitKey(0)
-                    if k == 27:
-                        exit(0)
-                        #break
-
-            if tracked_obj is None:
+            if matched_obj is None:
                 new_tracks.append(obj)
             else:
-                obj.track_id = tracked_obj.track_id
-                tracked_obj.next_objs.append(obj)
-                tracked_obj.next_obj_ious.append(iou)
+                obj.track_id = matched_obj.track_id
+                matched_obj.next_objs.append(obj)
+                matched_obj.next_obj_ious.append(iou)
 
         # Split track that has multiple next objs in the same frame
         for obj in active_tracked_objs.values():
-            if in_range(obj):
-                print("len(obj.next_objs) ", len(obj.next_objs))
-                
             if len(obj.next_objs) == 0:
                 continue
             max_iou = max(obj.next_obj_ious)
@@ -325,89 +339,46 @@ def track(base_path, video_path):
 
         # Add new tracks for non-matched objs
         for obj in new_tracks:
-            if in_range(obj):
-                print("Add new track")
-            active_tracked_objs[track_count] = obj
-            obj.track_id = track_count
-            obj.refined_poly = copy.deepcopy(obj.poly)
+            tracked_obj = TrackedObj(obj)
+            tracked_obj.track_id = track_count
+            tracked_obj.refined_poly = copy.deepcopy(obj.poly)
+            tracked_obj.frames[json_frame_id] = collections.OrderedDict()
+            tracked_obj.frames[json_frame_id][angle] = obj
+            active_tracked_objs[track_count] = tracked_obj
             track_count += 1
-        #print("new_tracks: ", len(new_tracks))
         
         # Store matched results to frames
         to_delete = []
         for obj in active_tracked_objs.values():
-
-            if in_range(obj):
-                print("matched ", obj.matched)
-
+            # Handle non-matched objects from previous frame
             if is_new_frame:
-                if not obj.matched:
+                if json_frame_id_old not in obj.frames: # no match for any angles
                     obj.inactive_count += 1
                     if obj.inactive_count >= 8:
                         to_delete.append(obj.track_id)
                     continue
-                obj.matched = False
 
             if len(obj.next_objs) > 0:
-                obj.matched = True
                 obj.inactive_count = 0
-                if json_frame_id not in obj.frames.keys():
+                if json_frame_id not in obj.frames.keys():  # new frame
                     obj.frames[json_frame_id] = collections.OrderedDict()
                     obj.refined_poly = copy.deepcopy(obj.next_objs[0].poly)
                     obj.p = obj.next_objs[0].p
-                else:
+                    obj.angle_count = 1
+                else:   # different angles
                     obj.refined_poly = obj.refined_poly.intersection(obj.next_objs[0].poly)
+                    obj.angle_count += 1
                 obj.frames[json_frame_id][angle] = obj.next_objs[0]
+                obj.next_objs = []
+                obj.next_obj_ious = []
 
-        #print("to delete: ", len(to_delete))
         # Remove objs that has been inactive for a while
         for track_id in to_delete:
             inactive_tracked_objs[track_id] = active_tracked_objs[track_id]
             del active_tracked_objs[track_id]
 
-        if 0:
-            # save to json
-            frame_json = []
-            for obj in objs2:
-                obj.json["obj_id"] = obj.track_id
-                frame_json.append(obj.json)
-            with open(json_path, 'w') as f:
-                json.dump(frame_json, f, indent=4)
+        json_frame_id_old = json_frame_id
 
-        if 0:
-            max_dist = 0
-            max_dist_iou = None
-            for obj in objs1:
-                if len(obj.next_objs) > 0:
-                    d = dist(obj, obj.next_objs[0])
-                    if d > max_dist:
-                        max_dist = d
-                        max_dist_iou = obj.next_obj_ious[0]
-            print("[%05d]: dist: %10.2f, %.3f" % (len(frames), max_dist, max_dist_iou))
-
-        if 0:
-            fig, ax = plt.subplots(figsize=(15,7))
-            for obj in objs1:
-                ax.plot(obj.p[0], obj.p[1], 'bo', markersize = 3)
-            for obj in objs2:
-                ax.plot(obj.p[0], obj.p[1], 'rs',  markersize = 2)
-
-            for obj in objs1:
-                if len(obj.next_objs) > 0:
-                    a = [obj.p[0], obj.next_objs[0].p[0]]
-                    b = [obj.p[1], obj.next_objs[0].p[1]]
-                    ax.plot(a, b, 'k')
-
-            plt.show()
-            if 0:
-                fig.canvas.draw()
-                img = np.array(fig.canvas.renderer._renderer)
-                #cv2.namedWindow("result", cv2.WND_PROP_FULLSCREEN)
-                #cv2.setWindowProperty("result",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-                cv2.imshow("result", img)
-                k = cv2.waitKey()
-                if k == 27:
-                    exit(0)
 
     if video_path is not None:
         out_video.release()
