@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 #from scipy.spatial.distance import cdist
 #from scipy.optimize import linear_sum_assignment
 from shapely.geometry import box, Polygon
+import pprint
+#import gc
 
 def IoU(b1, b2):
     intersection = [max(b1[0], b2[0]), max(b1[1], b2[1]), min(b1[2], b2[2]), min(b1[3], b2[3])]
@@ -260,24 +262,26 @@ def track(base_path, video_path):
                 obj_json["obj_id"] = obj.track_id
                 if obj.track_id in discarded_track_ids:
                     obj_json["discarded"] = True
-                obj_json["refined_polygon"] = [[x, y] for x,y in obj.refined_poly.exterior.coords]
+                obj_json["refined_polygon"] = [[round(x,4), round(y,4)] for x,y in obj.refined_poly.exterior.coords]
                 obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
-                    "polygon":angle_obj.box} for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
+                    "polygon":[[round(p[0],4), round(p[1],4)]for p in angle_obj.box]}
+                    for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
                 frame_json.append(obj_json)
             json_path = os.path.join(base_path, "%05d.tracked.json" % json_frame_id_old)
             with open(json_path, 'w') as f:
-                json.dump(frame_json, f, indent=4)
+                f.write(pprint.pformat(frame_json, width=200, indent=1))
+                #json.dump(frame_json, f)
 
             # Move discarded tracks to inactive list
             for track_id in discarded_track_ids:
                 obj = active_tracked_objs[track_id]
                 obj.discarded = True
-                inactive_tracked_objs[track_id] = obj
+                #inactive_tracked_objs[track_id] = obj
                 del active_tracked_objs[track_id]
 
             # Show results
-            #if 0:
-            if video_path is not None:
+            if 0:
+            #if video_path is not None:
                 for obj in active_tracked_objs.values():
                     c = color[obj.track_id % len(color)]
                     pts =[]
@@ -374,11 +378,11 @@ def track(base_path, video_path):
 
         # Remove objs that has been inactive for a while
         for track_id in to_delete:
-            inactive_tracked_objs[track_id] = active_tracked_objs[track_id]
+            #inactive_tracked_objs[track_id] = active_tracked_objs[track_id]
             del active_tracked_objs[track_id]
 
         json_frame_id_old = json_frame_id
-
+        #gc.collect()
 
     if video_path is not None:
         out_video.release()
