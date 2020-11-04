@@ -203,7 +203,11 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
         print("Frame Count:\t", int(video.get(cv2.CAP_PROP_FRAME_COUNT)))
 
         out_video_path = video_path[0:video_path.rfind(".")] + "_tracked.mp4"
-        out_video = cv2.VideoWriter(out_video_path,cv2.VideoWriter_fourcc('a', 'v', 'c', '1'), fps, (frame_w,frame_h))
+        if sys.platform == "win32":
+            fourcc = cv2.VideoWriter_fourcc('a', 'v', 'c', '1')
+        else:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_video = cv2.VideoWriter(out_video_path, fourcc, fps, (frame_w,frame_h))
         print(out_video_path)
 
     active_tracked_objs = collections.OrderedDict()
