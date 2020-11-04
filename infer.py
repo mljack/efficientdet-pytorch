@@ -204,7 +204,7 @@ class DatasetRetriever(Dataset):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
-def predict(net, config, angle, json_path = None, img_path = None, img_bytes = None, np_img = None, delay = 1):
+def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img = None, delay = 1):
     dataset = DatasetRetriever(crop_size=config.crop_size, overlap_size=config.overlap_size,
         image_scale=config.image_scale, path=img_path, img_bytes=img_bytes, np_img=np_img,
         transform=get_valid_transforms(config.image_scale), angle=angle)
@@ -274,8 +274,8 @@ def predict(net, config, angle, json_path = None, img_path = None, img_bytes = N
             cv2.imwrite(config.img_name, img2)
         height, width, _ = img2.shape
         if width > 1920:
-            cv2.namedWindow("result", cv2.WINDOW_NORMAL);
-            cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN);
+            cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.imshow("result", img2)
         k = cv2.waitKey(delay)
         if k == 27:
@@ -283,19 +283,106 @@ def predict(net, config, angle, json_path = None, img_path = None, img_bytes = N
 
     return results
 
+def load_frame(results):
+    for angle, objs in results:
+        yield "00000_%d.json" % int(angle), objs
+    yield "00001_0.json", []
+
+def predict_obb(net, config, img_path = None, img_bytes = None, np_img = None, delay = 1):
+    import track
+    angles = [float(v) for v in range(0, 90, 15)]
+    #angles = [0.0, 30.0]
+    results = []
+    for angle in angles:
+        start = time.time()
+        result = predict(net, config, angle, img_path=img_path, img_bytes=img_bytes, np_img=np_img, delay=delay)
+        print("[%d]: Found %3d vehicles in %.3fs" % (angle, len(result), time.time() - start))
+        results.append((angle, result))
+    objs = track.track(load_frame(results), single_frame_obb = True)
+    print(len(objs))
+    return objs
+
 def run(path, angles):
+    net, config = init_net()
+
     if len(angles) == 0:
         angles = [0.0]
     else:
-        angles = [float(a) for a in range(90)]
-        #angles = [float(s) for s in angles]
+        angles = [float(s) for s in angles]
 
+    if os.path.isdir(path):
+        output_base_path = path + "_det"
+        if not os.path.isdir(output_base_path):
+            os.mkdir(output_base_path)
+        for item in os.listdir(path):
+            ext = item[item.rfind(".")+1:]
+            if ext.lower() not in ("png", "jpg", "jpeg", "bmp"):
+                continue
+            start = time.time()
+            img_path = os.path.join(path, item)
+            results = predict(net, config, angle=0.0, img_path=img_path, delay=0)
+            output_path = os.path.join(output_base_path, item)
+            txt_path = output_path[0:output_path.rfind(".")]+".txt" if config.save_result else None
+            if txt_path is not None:
+                with open(txt_path, "w") as f:
+                    for result in results:
+                        box = result["box"]
+                        f.write("vehicle %f %f %f %f %f\n" % (result["score"], box[0], box[1], box[2], box[3]))
+            print("[%s]: Found %3d vehicles in %.3fs" % (item, len(results), time.time() - start))
+        return
+ 
+    ext = path[path.rfind(".")+1:]
+    if ext.lower() in ("png", "jpg", "jpeg", "bmp"):
+        start = time.time()
+        json_path = path[0:path.rfind(".")]+".vehicles.json" if config.save_result else None
+        for angle in angles:
+            results = predict(net, config, angle, img_path=path, delay=0)
+            if config.result_format == "json" and json_path is not None:
+                with open(json_path.replace(".json", "_%02d.json" % int(angle)), "w") as f:
+                    json.dump(results, f, indent=1)
+            elif config.result_format == "txt" and json_path is not None:
+                with open(json_path.replace(".json", "_det.txt"), "w") as f:
+                    for result in results:
+                        box = result["box"]
+                        f.write("vehicle %f %f %f %f %f\n" % {result["score"], box[0], box[1], box[2], box[3]})
+        print(time.time() - start)
+    elif ext.lower() in ("mpg", "mpeg", "mov", "mp4"):
+        torch.backends.cudnn.benchmark = True
+        video = cv2.VideoCapture(path)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        print("FPS:\t\t%6.2f" % fps)
+        print("Frame Count:\t", int(video.get(cv2.CAP_PROP_FRAME_COUNT)))
+        base = path.replace("."+ext, "")+"_objs"
+        if not os.path.isdir(base):
+            os.mkdir(base)
+        count = -1
+        has_frame = True
+        while has_frame:
+            count += 1
+            has_frame, img = video.read()
+            if not has_frame:
+                break
+            #if count < 34*30 :
+            #if count < 6000 :
+            #    continue
+            start = time.time()
+            json_path = os.path.join(base, "%05d.json" % count) if config.save_result else None
+            for angle in angles:
+                result = predict(net, config, angle, np_img=img)
+                if json_path is not None:
+                    with open(json_path.replace(".json", "_%02d.json" % int(angle)), "w") as f:
+                        json.dump(result, f, indent=1)
+            print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
+
+def init_net():
     class Config:
         box_color = None
-        show_img = True
+        show_img = False
         save_img = False
         img_name = "save_16.png"
         save_result = True
+        #result_format = "json"
+        result_format = "txt"
     config = Config()
 
     config.box_color = (0,0,255)
@@ -331,44 +418,7 @@ def run(path, angles):
         #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-005epoch.bin')
         #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_012_768_1536_rotated_obb_no_cutout_more_bus_tong_more_color_gray_blur_aug_lr1e-4_bs4_epoch32/best-checkpoint-005epoch.bin')
         net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_013_768_1536_rotated_obb_no_cutout_more_bus_tong_changtai_jinqiao_colorjitter0.2_lr1e-4_bs4_epoch32/best-checkpoint-001epoch.bin')
-        
-    ext = path[path.rfind(".")+1:]
-    if ext.lower() in ("png", "jpg", "jpeg", "bmp"):
-        start = time.time()
-        json_path = path[0:path.rfind(".")]+".vehicles.json" if config.save_result else None
-        for angle in angles:
-            result = predict(net, config, img_path=path, delay=0, angle=angle, json_path = json_path)
-            if json_path is not None:
-                with open(json_path.replace(".json", "_%02d.json" % int(angle)), "w") as f:
-                    json.dump(result, f, indent=4)
-        print(time.time() - start)
-    elif ext.lower() in ("mpg", "mpeg", "mov", "mp4"):
-        torch.backends.cudnn.benchmark = True
-        video = cv2.VideoCapture(path)
-        fps = video.get(cv2.CAP_PROP_FPS)
-        print("FPS:\t\t%6.2f" % fps)
-        print("Frame Count:\t", int(video.get(cv2.CAP_PROP_FRAME_COUNT)))
-        base = path.replace("."+ext, "")+"_objs"
-        if not os.path.isdir(base):
-            os.mkdir(base)
-        count = -1
-        has_frame = True
-        while has_frame:
-            count += 1
-            has_frame, img = video.read()
-            if not has_frame:
-                break
-            #if count < 34*30 :
-            #if count < 29*30 :
-            #    continue
-            start = time.time()
-            json_path = os.path.join(base, "%05d.json" % count) if config.save_result else None
-            for angle in angles:
-                result = predict(net, config, np_img = img, angle = angle, json_path = json_path)
-                if json_path is not None:
-                    with open(json_path.replace(".json", "_%02d.json" % int(angle)), "w") as f:
-                        json.dump(result, f, indent=4)
-            print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
+    return net, config
 
 if __name__ == '__main__':
     if torch.cuda.device_count() > 1:
@@ -379,5 +429,3 @@ if __name__ == '__main__':
         print("Usage: python infer.py test.jpg [0 30 60]")
     else:
         run(sys.argv[1], sys.argv[2:])
-
-

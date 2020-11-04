@@ -89,13 +89,6 @@ class Obj:
             (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) * 0.25)
 
 
-def load_objs(path):
-    with open(path) as f:
-        objs = []
-        for idx, obj_json in enumerate(json.load(f)):
-            objs.append(Obj(idx, obj_json))
-    return objs
-
 def dist(a, b):
     return math.sqrt((a.p[0]-b.p[0])*(a.p[0]-b.p[0]) + (a.p[1]-b.p[1])*(a.p[1]-b.p[1]))
 
@@ -183,7 +176,17 @@ def debug_show_objs(json_frame_id, obj, img, active_tracked_objs, iou, angle):
             exit(0)
             #break
 
-def track(base_path, video_path):
+def read_json_objs(base_path):
+    files = sorted(os.listdir(base_path))
+    json_frame_id_old = -1
+    start = time.time()
+    for item in files:
+        if item.find(".json") == -1 or item.find(".tracked.json") != -1:
+            continue
+        with open(os.path.join(base_path, item)) as f:
+            yield item, json.load(f)
+
+def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
     track_count = 0
 
     if video_path is not None:
@@ -205,25 +208,22 @@ def track(base_path, video_path):
 
     active_tracked_objs = collections.OrderedDict()
     inactive_tracked_objs = collections.OrderedDict()
+    frames = []
     img = None
     frame_id = -1
-    files = sorted(os.listdir(base_path))
     json_frame_id_old = -1
     start = time.time()
-    for item in files:
-        if item.find(".json") == -1 or item.find(".tracked.json") != -1:
-            continue
-
+    for item, objs_json in json_objs:
         tokens = item.replace(".json", "").split("_")
         json_frame_id = int(tokens[0])
         angle = int(tokens[1]) if len(tokens) > 1 else 0
-        
+
         #if angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
-        if angle not in {0, 10, 20, 30, 40, 50, 60, 70, 80}:
+        #if angle not in {0, 10, 20, 30, 40, 50, 60, 70, 80}:
         #if angle not in {0, 15, 30, 15, 60, 75}:
         #if angle not in {0, 30, 60}:
         #if angle not in {0}:
-            continue
+        #    continue
 
         debug_print_objs(active_tracked_objs, inactive_tracked_objs, angle)
         
@@ -254,23 +254,27 @@ def track(base_path, video_path):
                             discarded_track_ids.add(obj_a.track_id)
 
             # Save to json
-            frame_json = []
-            for obj in active_tracked_objs.values():
-                if json_frame_id_old not in obj.frames:
-                    continue
-                obj_json = {}
-                obj_json["obj_id"] = obj.track_id
-                if obj.track_id in discarded_track_ids:
-                    obj_json["discarded"] = True
-                obj_json["refined_polygon"] = [[round(x,4), round(y,4)] for x,y in obj.refined_poly.exterior.coords]
-                obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
-                    "polygon":[[round(p[0],4), round(p[1],4)]for p in angle_obj.box]}
-                    for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
-                frame_json.append(obj_json)
-            json_path = os.path.join(base_path, "%05d.tracked.json" % json_frame_id_old)
-            with open(json_path, 'w') as f:
-                f.write(pprint.pformat(frame_json, width=200, indent=1))
-                #json.dump(frame_json, f)
+            if output_path is not None or single_frame_obb:
+                frame_json = []
+                for obj in active_tracked_objs.values():
+                    if json_frame_id_old not in obj.frames:
+                        continue
+                    obj_json = {}
+                    obj_json["obj_id"] = obj.track_id
+                    if obj.track_id in discarded_track_ids:
+                        obj_json["discarded"] = True
+                    obj_json["refined_polygon"] = [[round(x,4), round(y,4)] for x,y in obj.refined_poly.exterior.coords]
+                    obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
+                        "polygon":[[round(p[0],4), round(p[1],4)]for p in angle_obj.box]}
+                        for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
+                    frame_json.append(obj_json)
+                if output_path is not None:
+                    json_path = os.path.join(output_path, "%05d.tracked.json" % json_frame_id_old)
+                    with open(json_path, 'w') as f:
+                        f.write(pprint.pformat(frame_json, width=200, indent=1))
+                        #json.dump(frame_json, f)
+                if single_frame_obb:
+                    return frame_json
 
             # Move discarded tracks to inactive list
             for track_id in discarded_track_ids:
@@ -305,8 +309,9 @@ def track(base_path, video_path):
                 frame_id += 1
             img = video_img.copy()
 
-        json_path = os.path.join(base_path, item)
-        objs = load_objs(json_path)
+        objs = []
+        for idx, obj_json in enumerate(objs_json):
+            objs.append(Obj(idx, obj_json))
 
         new_tracks = []
 
@@ -393,4 +398,5 @@ if __name__ == '__main__':
     if len(sys.argv) < 2 or len(sys.argv) > 3:
         print("Usage: python track.py detection-folder [video.mp4]")
     else:
-        track(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else None)
+        video_path = sys.argv[2] if len(sys.argv) == 3 else None
+        track(read_json_objs(sys.argv[1]), output_path=sys.argv[1], video_path=video_path)
