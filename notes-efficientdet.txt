@@ -45,3 +45,8 @@ E:\efficientdet-pytorch\drone>python generate_train_test_set.py 123
 open the finetune-drone-train.ipynb adnd execute
 Put testing pictures into (E:\efficientdet-pytorch\drone\test)
 open the finetune-drone-test.ipynb adnd execute
+
+
+python track.py _datasets\test\20200901M2_20200903_1152_250m_objs _datasets\test\20200901M2_20200903_1152_250m.MP4
+(efficientdet-pytorch) K:\ws\Object-Detection-Metrics>python pascalvoc.py -gt K:\ws\efficientdet-pytorch\_datasets\test\20200901M2_20200907_1202_200m_fixed_dataset -det K:\ws\efficientdet-pytorch\_datasets\test\20200901M2_20200907_1202_200m_fixed_dataset_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np
+(efficientdet-pytorch) D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos>python generate_standard_raw_data.py 20200901M2_20200903_1152_250m_1_objs 20200901M2_20200903_1152_250m_1.mp4 a.csv

@@ -362,8 +362,8 @@ def run(path, angles):
             has_frame, img = video.read()
             if not has_frame:
                 break
-            #if count < 34*30 :
-            #if count < 6000 :
+            #if count < 34*30:
+            #if count < 6000:
             #    continue
             start = time.time()
             json_path = os.path.join(base, "%05d.json" % count) if config.save_result else None
@@ -381,8 +381,8 @@ def init_net():
         save_img = False
         img_name = "save_16.png"
         save_result = True
-        #result_format = "json"
-        result_format = "txt"
+        result_format = "json"
+        #result_format = "txt"
     config = Config()
 
     config.box_color = (0,0,255)
@@ -417,7 +417,9 @@ def init_net():
         #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-015epoch.bin')
         #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-005epoch.bin')
         #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_012_768_1536_rotated_obb_no_cutout_more_bus_tong_more_color_gray_blur_aug_lr1e-4_bs4_epoch32/best-checkpoint-005epoch.bin')
-        net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_013_768_1536_rotated_obb_no_cutout_more_bus_tong_changtai_jinqiao_colorjitter0.2_lr1e-4_bs4_epoch32/best-checkpoint-001epoch.bin')
+        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_013_768_1536_rotated_obb_no_cutout_more_bus_tong_changtai_jinqiao_colorjitter0.2_lr1e-4_bs4_epoch32/best-checkpoint-001epoch.bin')
+        net = load_net(model_name, config.image_scale, '_models/model-018-best-checkpoint-001epoch.bin')
+        
     return net, config
 
 if __name__ == '__main__':
