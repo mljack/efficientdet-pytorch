@@ -98,8 +98,8 @@ def get_train_transforms2(img_scale):
             #    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.9),
             #],p=0.9),
             A.OneOf([
-                A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.9),
-                A.ToGray(p=0.1),
+                A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.05, p=0.95),
+                A.ToGray(p=0.05),
             ],p=0.9),
             A.GaussianBlur(p=0.2),
             #A.ChannelShuffle(p=1.0),
@@ -291,19 +291,19 @@ class Fitter:
             t = time.time()
             summary_loss = self.train_one_epoch(train_loader)
 
-            self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {(time.time() - t):.5f}')
+            self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                  ')
             self.save(f'{self.base_dir}/last-checkpoint.bin')
 
             t = time.time()
             summary_loss = self.validation(validation_loader)
 
-            self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {(time.time() - t):.5f}')
+            self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                   ')
             if summary_loss.avg < self.best_summary_loss:
                 self.best_summary_loss = summary_loss.avg
-                self.model.eval()
-                self.save(f'{self.base_dir}/best-checkpoint-{str(self.epoch).zfill(3)}epoch.bin')
-                #for path in sorted(glob(f'{self.base_dir}/best-checkpoint-*epoch.bin'))[:-3]:
-                #    os.remove(path)
+            self.model.eval()
+            self.save(f'{self.base_dir}/best-checkpoint-{str(self.epoch).zfill(3)}epoch.bin')
+            #for path in sorted(glob(f'{self.base_dir}/best-checkpoint-*epoch.bin'))[:-3]:
+            #    os.remove(path)
 
             if self.config.validation_scheduler:
                 self.scheduler.step(metrics=summary_loss.avg)
@@ -320,7 +320,8 @@ class Fitter:
                     print(
                         f'Val Step {step}/{len(val_loader)}, ' + \
                         f'summary_loss: {summary_loss.avg:.5f}, ' + \
-                        f'time: {(time.time() - t):.5f}', end='\r'
+                        f'time: {((time.time() - t)/60.0):.1f} mins ' + \
+                        f'remaining: {(time.time() - t)/(step+1)*(len(val_loader)-step-1)/60:.1f} mins           ', end='\r'
                     )
             with torch.no_grad():
                 images = torch.stack(images)
@@ -352,7 +353,8 @@ class Fitter:
                     print(
                         f'Train Step {step}/{len(train_loader)}, ' + \
                         f'summary_loss: {summary_loss.avg:.5f}, ' + \
-                        f'time: {(time.time() - t):.5f}', end='\r'
+                        f'time: {((time.time() - t)/60.0):.1f} mins ' + \
+                        f'remaining: {((time.time() - t)/(step+1)*(len(train_loader)-step-1)/60.0):.1f} mins            ', end='\r'
                     )
             
             images = torch.stack(images)
@@ -402,10 +404,10 @@ class Fitter:
         self.epoch = checkpoint['epoch'] + 1
 
 class TrainGlobalConfig:
-    num_workers = 0
+    num_workers = 4
     batch_size = 4
-    n_epochs = 6 # n_epochs = 40
-    lr = 0.000001
+    n_epochs = 20
+    lr = 0.00005
 
     # -------------------
     verbose = True
@@ -413,6 +415,7 @@ class TrainGlobalConfig:
     # -------------------
 
     # --------------------
+    '''
     step_scheduler = True  # do scheduler.step after optimizer.step
     validation_scheduler = False  # do scheduler.step after validation stage loss
     SchedulerClass = torch.optim.lr_scheduler.OneCycleLR
@@ -440,7 +443,7 @@ class TrainGlobalConfig:
         min_lr=1e-8,
         eps=1e-08
     )
-    '''
+    
 
 def collate_fn(batch):
     return tuple(zip(*batch))
@@ -541,6 +544,8 @@ if __name__ == '__main__':
         "0013_dataset_tongji_011_768_768_obb",
         "0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb",
         "0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb",
+        "0016_dataset_ysq1_768_768_obb",
+        "0017_dataset_ysq1_1440_768_obb",
         ]
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'

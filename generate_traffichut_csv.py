@@ -80,11 +80,15 @@ def generate(objs_base_path, video_path, csv_path):
                 f.write(",".join([str(t) for t in line]))
                 f.write("\n")
 
-    if 0:
+    if 1:
         fps = video.get(cv2.CAP_PROP_FPS)
         frame_w = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_h = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        out_video = cv2.VideoWriter(video_path.replace(".", "_tracked."), cv2.VideoWriter_fourcc('a', 'v', 'c', '1'), fps, (frame_w,frame_h))
+        if sys.platform == "win32":
+            fourcc = cv2.VideoWriter_fourcc('a', 'v', 'c', '1')
+        else:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_video = cv2.VideoWriter(video_path.replace(".", "_tracked."), fourcc, fps, (frame_w,frame_h))
         color = ((255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255),(0,0,0),(255,255,255),
                 (180,0,0),(0,180,0),(0,0,180),(180,180,0),(180,0,180),(255,180,255),(255,255,180),
                 (180,255,0),(180,0,255),(0,180,255),(255,180,0),(255,0,180),(0,255,180),(180,255,255))
@@ -102,14 +106,15 @@ def generate(objs_base_path, video_path, csv_path):
                 img = cv2.rectangle(img, (int(s.box_x), int(s.box_y)), (int(s.box_x+s.box_w), int(s.box_y+s.box_h)), color[s.id % len(color)], 3)
                 img = cv2.line(img, (int(s.box_x+s.box_w/2), int(s.box_y+s.box_h/2)), (int(s.box_x+s.box_w/2+s.speed*math.cos(s.arctan)), int(s.box_y+s.box_h/2+s.speed*math.sin(s.arctan))), (0,255,0), 3)
 
-            cv2.namedWindow("result", cv2.WND_PROP_FULLSCREEN)
-            cv2.setWindowProperty("result",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-            cv2.imshow("result", img)
-            #cv2.imwrite("saved.png", img)
             out_video.write(img)
-            k = cv2.waitKey(1)
-            if k == 27:
-                break
+            if 0:
+                cv2.namedWindow("result", cv2.WND_PROP_FULLSCREEN)
+                cv2.setWindowProperty("result",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+                cv2.imshow("result", img)
+                #cv2.imwrite("saved.png", img)
+                k = cv2.waitKey(1)
+                if k == 27:
+                    break
         out_video.release()
     video.release()
 

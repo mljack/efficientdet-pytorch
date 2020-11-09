@@ -142,3 +142,5 @@ dmypy.json
 _datasets
 _models
 _archived
+_datasets/test
+_videos
