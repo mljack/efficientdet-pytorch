@@ -219,12 +219,16 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
         json_frame_id = int(tokens[0])
         angle = int(tokens[1]) if len(tokens) > 1 else 0
 
+        if json_frame_id % 20 == 0 and angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
+            continue
+        elif json_frame_id % 20 != 0 and angle not in {0}:
+            continue
         #if angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
         #if angle not in {0, 10, 20, 30, 40, 50, 60, 70, 80}:
         #if angle not in {0, 15, 30, 15, 60, 75}:
         #if angle not in {0, 30, 60}:
-        if angle not in {0}:
-            continue
+        #if angle not in {0}:
+        #    continue
 
         debug_print_objs(active_tracked_objs, inactive_tracked_objs, angle)
         
@@ -292,8 +296,8 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
             #summary.print_(sum1)
 
             # Show results
-            if 0:
-            #if video_path is not None:
+            #if 0:
+            if video_path is not None:
                 for obj in active_tracked_objs.values():
                     pts = np.int32(np.array([(x,y) for x,y in obj.refined_poly.exterior.coords]))
                     img = cv2.drawContours(img, (pts,), 0, color[obj.track_id % len(color)], 3)
@@ -343,7 +347,7 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
                 if obj.next_obj_ious[k] == max_iou:
                     selected_obj = next_obj
                     kk = k
-            if 0:
+            if 1:
                 # Ignore highly overlapped detections
                 for k, next_obj in enumerate(obj.next_objs):
                     if k != kk:
