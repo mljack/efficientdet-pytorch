@@ -25,11 +25,11 @@ def get_valid_transforms(image_scale):
             ToTensorV2(p=1.0),
         ], p=1.0)
 
-def load_net(model_name, image_scale, checkpoint_path):
+def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config = get_efficientdet_config(model_name)
     net = EfficientDet(config, pretrained_backbone=False)
 
-    config.num_classes = 1
+    config.num_classes = num_classes
     config.image_size = image_scale
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
@@ -40,7 +40,7 @@ def load_net(model_name, image_scale, checkpoint_path):
     gc.collect()
 
     net = DetBenchPredict(net, config)
-    net.eval();
+    net.eval()
     return net.cuda()
 
 def make_predictions(images, net, score_threshold=0.22):
@@ -52,22 +52,25 @@ def make_predictions(images, net, score_threshold=0.22):
         img_size = torch.tensor(img_size).float().cuda()
         det = net(images, img_scale, img_size)
         for i in range(images.shape[0]):
-            boxes = det[i].detach().cpu().numpy()[:,:4]    
-            scores = det[i].detach().cpu().numpy()[:,4]
-            indexes = np.where(scores > score_threshold)[0]
-            boxes = boxes[indexes]
+            d = det[i].detach().cpu().numpy()
+            boxes = d[:,:4]    
+            scores = d[:,4]
+            classes = d[:,5]
+            indices = np.where(scores > score_threshold)[0]
+            boxes = boxes[indices]
             boxes[:, 2] = boxes[:, 2] + boxes[:, 0]
             boxes[:, 3] = boxes[:, 3] + boxes[:, 1]
             predictions.append({
-                'boxes': boxes[indexes],
-                'scores': scores[indexes],
+                'boxes': boxes[indices],
+                'scores': scores[indices],
+                'classes': classes[indices]
             })
     return [predictions]
 
-def run_wbf(predictions, image_index, image_size, iou_thr=0.44, skip_box_thr=0.43, weights=None):
-    boxes = [(prediction[image_index]['boxes']/(image_size-1)).tolist()  for prediction in predictions]
-    scores = [prediction[image_index]['scores'].tolist()  for prediction in predictions]
-    labels = [np.ones(prediction[image_index]['scores'].shape[0]).tolist() for prediction in predictions]
+def run_wbf(predictions, image_index, image_size, iou_thr=0.01, skip_box_thr=0.009, weights=None):
+    boxes = [(prediction[image_index]['boxes']/(image_size-1)).tolist() for prediction in predictions]
+    scores = [prediction[image_index]['scores'].tolist() for prediction in predictions]
+    labels = [prediction[image_index]['classes'].tolist() for prediction in predictions]
     boxes, scores, labels = weighted_boxes_fusion(boxes, scores, labels, weights=None, iou_thr=iou_thr, skip_box_thr=skip_box_thr)
     boxes = boxes*(image_size-1)
     return boxes, scores, labels
@@ -120,8 +123,8 @@ def rotate_im(image, angle):
 
     if 0:
         cv2.imwrite("rotated.png", image*255)
-        cv2.namedWindow("input", cv2.WINDOW_NORMAL);
-        cv2.setWindowProperty("input", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN);
+        cv2.namedWindow("input", cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty("input", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.imshow("input", image)
         k = cv2.waitKey()
         if k == 27:
@@ -223,6 +226,7 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             img = img.permute(1,2,0).cpu().numpy()
             boxes, scores, labels = run_wbf(predictions, image_index=i, image_size=config.image_scale)
             for k, label in enumerate(labels):
+                #bbox = boxes[k]
                 bbox = boxes[k].tolist()
                 inside = True
                 inside = inside and (base_x[i] == dataset.count_w - 1 or (bbox[0]+bbox[2])*0.5*dataset.bbox_scale < config.crop_size - config.overlap_size // 2)
@@ -255,6 +259,7 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             bbox = obj["box"]
             score = obj["score"]
             polygon = obj["polygon"]
+            class_id = int(obj["label"])
             start_point = (int(bbox[0]), int(bbox[1])) 
             end_point = (int(bbox[2]), int(bbox[3])) 
             c = color[obj["crop_idx"]%len(color)] if config.box_color is None else config.box_color
@@ -269,6 +274,10 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             else:
                 contour = np.array(polygon)
                 img2 = cv2.drawContours(img2, [np.int0(contour)], 0, c, 2)
+            class_name_maps = ["bg", "ped", "bike", "motor"]
+            #print(class_id)
+            img2 = cv2.putText(img2, class_name_maps[class_id], start_point, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) , 2, cv2.LINE_AA) 
+
             
         if config.save_img:
             cv2.imwrite(config.img_name, img2)
@@ -291,7 +300,7 @@ def load_frame(results):
 def predict_obb(net, config, img_path = None, img_bytes = None, np_img = None, delay = 1):
     import track
     angles = [float(v) for v in range(0, 90, 15)]
-    #angles = [0.0, 30.0]
+    angles = [0.0]
     results = []
     for angle in angles:
         start = time.time()
@@ -377,7 +386,7 @@ def run(path, angles):
 def init_net():
     class Config:
         box_color = None
-        show_img = False
+        show_img = True
         save_img = False
         img_name = "save_16.png"
         save_result = True
@@ -388,6 +397,7 @@ def init_net():
     config.box_color = (0,0,255)
     #config.box_color = (0,255,0)
     #config.box_color = (0,255,255)
+    num_classes = 3
 
     if 0:
         config.crop_size = 512
@@ -395,30 +405,46 @@ def init_net():
         config.overlap_size = 200
         config.batch_size = 64
         model_name = 'tf_efficientdet_d2'
-        net = load_net(model_name, config.image_scale, 'effdet-d2-drone_003_512_1024_bs8_epoch32/best-checkpoint-005epoch.bin')
+        net = load_net(model_name, config.image_scale, num_classes, 'effdet-d2-drone_003_512_1024_bs8_epoch32/best-checkpoint-005epoch.bin')
     if 0:
         config.crop_size = 896
         config.image_scale = 896
         config.overlap_size = 200
         config.batch_size = 8
         model_name = 'tf_efficientdet_d3'
-        net = load_net(model_name, config.image_scale, 'effdet-d3-drone_004_896_1792_bs2_epoch6/best-checkpoint-000epoch.bin')
-        #net = load_net(model_name, config.image_scale, 'effdet-d3-drone_004_896_1792_bs2_epoch6/last-checkpoint.bin')
+        net = load_net(model_name, config.image_scale, num_classes, 'effdet-d3-drone_004_896_1792_bs2_epoch6/best-checkpoint-000epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, 'effdet-d3-drone_004_896_1792_bs2_epoch6/last-checkpoint.bin')
     if 1:
-        config.crop_size = 768
+        config.crop_size = 384
         config.image_scale = 768
         config.overlap_size = 200
         config.batch_size = 32
         model_name = 'tf_efficientdet_d2'
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_005_768_1536_bs4_epoch6/best-checkpoint-000epoch.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_005_768_1536_bs4_epoch6/last-checkpoint.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_006_768_1536_rotated_obb_no_cutout_bs2_epoch3/best-checkpoint-002epoch.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_007_768_1536_rotated_obb_no_cutout_more_bus_bs4_epoch4/best-checkpoint-003epoch.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-015epoch.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-005epoch.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_012_768_1536_rotated_obb_no_cutout_more_bus_tong_more_color_gray_blur_aug_lr1e-4_bs4_epoch32/best-checkpoint-005epoch.bin')
-        #net = load_net(model_name, config.image_scale, '_models/effdet-d2-drone_013_768_1536_rotated_obb_no_cutout_more_bus_tong_changtai_jinqiao_colorjitter0.2_lr1e-4_bs4_epoch32/best-checkpoint-001epoch.bin')
-        net = load_net(model_name, config.image_scale, '_models/model-018-best-checkpoint-001epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_005_768_1536_bs4_epoch6/best-checkpoint-000epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_005_768_1536_bs4_epoch6/last-checkpoint.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_006_768_1536_rotated_obb_no_cutout_bs2_epoch3/best-checkpoint-002epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_007_768_1536_rotated_obb_no_cutout_more_bus_bs4_epoch4/best-checkpoint-003epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-015epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_010_768_1536_rotated_obb_no_cutout_more_bus_tongji_bs4_epoch16/best-checkpoint-005epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_012_768_1536_rotated_obb_no_cutout_more_bus_tong_more_color_gray_blur_aug_lr1e-4_bs4_epoch32/best-checkpoint-005epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_013_768_1536_rotated_obb_no_cutout_more_bus_tong_changtai_jinqiao_colorjitter0.2_lr1e-4_bs4_epoch32/best-checkpoint-001epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-005-best-checkpoint-000epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-007-best-checkpoint-003epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-013-best-checkpoint-001epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-018-best-checkpoint-001epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-021-best-checkpoint-002epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-023-best-checkpoint-000epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped4_384_lr3e-5_bs4_epoch100/best-checkpoint-075epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-241epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-115epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped8_ped_only_lr3e-5/best-checkpoint-079epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-041epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped8_ped_only_lr3e-5/best-checkpoint-061epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-031epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-015epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped9_ped_only_lr1e-3/best-checkpoint-010epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-027epoch.bin')
+        net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-000epoch.bin')
         
     return net, config
 

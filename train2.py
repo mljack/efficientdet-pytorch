@@ -76,7 +76,7 @@ def obb_to_aabb(bbox, **kwargs):
 def get_train_transforms():
     return A.Compose(
         [
-            A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.5),
+            #A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.5),
             A.Lambda(bbox=obb_to_aabb, always_apply=True, use_obb=True, p=1.0),
         ], 
         p=1.0, 
@@ -97,15 +97,15 @@ def get_train_transforms2(img_scale):
             #    A.HueSaturationValue(hue_shift_limit=0.5, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.9),
             #    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.9),
             #],p=0.9),
-            A.OneOf([
-                A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.05, p=0.95),
-                A.ToGray(p=0.05),
-            ],p=0.9),
-            A.GaussianBlur(p=0.2),
+            #A.OneOf([
+            #    A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.05, p=0.95),
+            #    A.ToGray(p=0.05),
+            #],p=0.9),
+            #A.GaussianBlur(p=0.2),
             #A.ChannelShuffle(p=1.0),
             #A.ToGray(p=0.3),
             A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
+            #A.VerticalFlip(p=0.5),
             #A.Resize(height=img_scale, width=img_scale, p=1.0),
             #A.Cutout(num_holes=4, max_h_size=32, max_w_size=32, fill_value=0, p=1.0),
             ToTensorV2(p=1.0),
@@ -147,6 +147,9 @@ def get_valid_transforms2(img_scale):
         )
     )
 
+class_id_maps = {5:2, 7:2, 8:1}
+class_name_maps = ["bg", "ped", "bike", "motor"]
+
 class DatasetRetriever(Dataset):
     def __init__(self, root, box_scale, transform=None, transform2=None, test=False):
         super(DatasetRetriever, self).__init__()
@@ -177,18 +180,26 @@ class DatasetRetriever(Dataset):
         with open(path.replace(".jpg", ".txt")) as f:
             lines = f.readlines()
         boxes = []
-        for line in lines:
+        cls_ids = []
+        for i, line in enumerate(lines):
             values = [float(token) for token in line.replace("\n", "").split(" ")]
+            if int(values[0]) != 8 and i+1 != len(lines):
+                continue
             bbox = [(values[1]-values[3]*0.5)*self.box_scale, (values[2]-values[4]*0.5)*self.box_scale,
                     (values[1]+values[3]*0.5)*self.box_scale, (values[2]+values[4]*0.5)*self.box_scale, values[5]+360.0 if values[5] < 0 else values[5]]
             boxes.append(bbox)
+            cls_ids.append(1)
+            #cls_ids.append(class_id_maps[int(values[0])])
             
         boxes = torch.tensor(boxes, dtype=torch.float32)
         boxes = torch.min(boxes, torch.tensor([float(self.box_scale)]))
         boxes = torch.max(boxes, torch.tensor([0.0]))
         
-        # there is only one class
-        labels = torch.ones((boxes.shape[0],), dtype=torch.int64)
+        if 0:
+            # there is only one class
+            labels = torch.ones((boxes.shape[0],), dtype=torch.int64)
+        else:
+            labels = torch.tensor(cls_ids, dtype=torch.int64)
         
         target = {}
         target['boxes'] = boxes
@@ -406,8 +417,11 @@ class Fitter:
 class TrainGlobalConfig:
     num_workers = 4
     batch_size = 4
-    n_epochs = 20
-    lr = 0.00005
+    n_epochs = 256
+    lr = 0.01
+    #lr = 0.001
+    #lr = 0.0001
+    #lr = 0.00003
 
     # -------------------
     verbose = True
@@ -471,12 +485,12 @@ def run_training(net, output_folder, logger):
     fitter = Fitter(model=net, device=device, config=TrainGlobalConfig, output_folder=output_folder, logger=logger)
     fitter.fit(train_loader, val_loader)
 
-def build_net(type, img_scale):
+def build_net(type, img_scale, num_classes):
     config = effdet.get_efficientdet_config(type)
     net = effdet.EfficientDet(config, pretrained_backbone=False)
     checkpoint = torch.load(model_path_base + '/' + type + '.pth')
     net.load_state_dict(checkpoint)
-    config.num_classes = 1
+    config.num_classes = num_classes
     config.image_size = img_scale
     net.class_net = effdet.efficientdet.HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
     return effdet.DetBenchTrain(net, config)
@@ -533,19 +547,21 @@ if __name__ == '__main__':
     SEED = 42
     seed_everything(SEED)
 
-    img_scale=768
-    box_scale=768
+    img_scale = 768
+    box_scale = 768
+    num_classes = 3
 
     datasets = [
-        "0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb",
-        "0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb",
-        "0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus",
-        "0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus",
-        "0013_dataset_tongji_011_768_768_obb",
-        "0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb",
-        "0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb",
-        "0016_dataset_ysq1_768_768_obb",
-        "0017_dataset_ysq1_1440_768_obb",
+        #"0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb",
+        #"0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb",
+        #"0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus",
+        #"0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus",
+        #"0013_dataset_tongji_011_768_768_obb",
+        #"0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb",
+        #"0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb",
+        #"0016_dataset_ysq1_768_768_obb",
+        #"0017_dataset_ysq1_1440_768_obb",
+        "a004_dataset_changan001_ped_bike_motor_384_768_3classes"
         ]
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
@@ -565,17 +581,19 @@ if __name__ == '__main__':
         for i, (img, target, img_id) in enumerate(train_dataset):
             img = img.permute(1,2,0).cpu().numpy()
             boxes = target['boxes'].cpu().numpy().astype(np.int32)
-            for box in boxes:
+            class_ids = target['labels'].cpu().numpy().astype(np.int32)
+            for i, box in enumerate(boxes):
                 cv2.rectangle(img, (box[1], box[0]), (box[3],  box[2]), (0, 1, 0), 1)
+                img = cv2.putText(img, class_name_maps[class_ids[i]], (box[1], box[0]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) , 2, cv2.LINE_AA) 
             cv2.imshow("image", cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             k = cv2.waitKey()
             if k == 27:
                 exit(0)
             if k == 13:
                 break
-        cv2.destroyWindow("image");
+        cv2.destroyWindow("image")
 
-    net = build_net(model_type, img_scale)
+    net = build_net(model_type, img_scale, num_classes)
     device = torch.device('cuda:0')
     net.to(device)
     copyfile(sys.argv[0], os.path.join(output_path, os.path.split(sys.argv[0])[-1]))
