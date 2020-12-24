@@ -50,3 +50,108 @@ open the finetune-drone-test.ipynb adnd execute
 python track.py _datasets\test\20200901M2_20200903_1152_250m_objs _datasets\test\20200901M2_20200903_1152_250m.MP4
 (efficientdet-pytorch) K:\ws\Object-Detection-Metrics>python pascalvoc.py -gt K:\ws\efficientdet-pytorch\_datasets\test\20200901M2_20200907_1202_200m_fixed_dataset -det K:\ws\efficientdet-pytorch\_datasets\test\20200901M2_20200907_1202_200m_fixed_dataset_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np
 (efficientdet-pytorch) D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos>python generate_standard_raw_data.py 20200901M2_20200903_1152_250m_1_objs 20200901M2_20200903_1152_250m_1.mp4 a.csv
+
+
+python infer.py D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset
+
+python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset -det D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np
+
+005
+[IoU 0.50]: mAP: 74.13%
+[IoU 0.55]: mAP: 73.34%
+[IoU 0.60]: mAP: 72.80%
+[IoU 0.65]: mAP: 71.64%
+[IoU 0.70]: mAP: 69.42%
+[IoU 0.75]: mAP: 64.62%
+[IoU 0.80]: mAP: 54.24%
+[IoU 0.85]: mAP: 35.36%
+[IoU 0.90]: mAP: 11.19%
+[IoU 0.95]: mAP: 0.28%
+[IoU 0.50:0.95]: mmAP: 0.527
+
+007
+[IoU 0.50]: mAP: 84.60%
+[IoU 0.55]: mAP: 83.89%
+[IoU 0.60]: mAP: 83.46%
+[IoU 0.65]: mAP: 82.36%
+[IoU 0.70]: mAP: 80.82%
+[IoU 0.75]: mAP: 77.00%
+[IoU 0.80]: mAP: 68.05%
+[IoU 0.85]: mAP: 50.90%
+[IoU 0.90]: mAP: 22.51%
+[IoU 0.95]: mAP: 2.14%
+[IoU 0.50:0.95]: mmAP: 0.636
+
+013
+[IoU 0.50]: mAP: 89.51%
+[IoU 0.55]: mAP: 89.13%
+[IoU 0.60]: mAP: 88.83%
+[IoU 0.65]: mAP: 88.23%
+[IoU 0.70]: mAP: 87.23%
+[IoU 0.75]: mAP: 84.31%
+[IoU 0.80]: mAP: 75.71%
+[IoU 0.85]: mAP: 55.98%
+[IoU 0.90]: mAP: 24.45%
+[IoU 0.95]: mAP: 2.19%
+[IoU 0.50:0.95]: mmAP: 0.686
+
+018
+[IoU 0.50]: mAP: 88.75%
+[IoU 0.55]: mAP: 88.56%
+[IoU 0.60]: mAP: 88.28%
+[IoU 0.65]: mAP: 87.92%
+[IoU 0.70]: mAP: 86.84%
+[IoU 0.75]: mAP: 83.99%
+[IoU 0.80]: mAP: 75.26%
+[IoU 0.85]: mAP: 54.52%
+[IoU 0.90]: mAP: 24.68%
+[IoU 0.95]: mAP: 1.45%
+[IoU 0.50:0.95]: mmAP: 0.680
+
+021
+[IoU 0.50]: mAP: 90.39%
+[IoU 0.55]: mAP: 90.17%
+[IoU 0.60]: mAP: 90.00%
+[IoU 0.65]: mAP: 89.36%
+[IoU 0.70]: mAP: 88.11%
+[IoU 0.75]: mAP: 85.54%
+[IoU 0.80]: mAP: 76.75%
+[IoU 0.85]: mAP: 54.48%
+[IoU 0.90]: mAP: 23.43%
+[IoU 0.95]: mAP: 1.42%
+[IoU 0.50:0.95]: mmAP: 0.690
+
+023
+[IoU 0.50]: mAP: 89.65%
+[IoU 0.55]: mAP: 89.59%
+[IoU 0.60]: mAP: 89.44%
+[IoU 0.65]: mAP: 89.10%
+[IoU 0.70]: mAP: 88.40%
+[IoU 0.75]: mAP: 86.52%
+[IoU 0.80]: mAP: 80.93%
+[IoU 0.85]: mAP: 65.53%
+[IoU 0.90]: mAP: 36.31%
+[IoU 0.95]: mAP: 5.33%
+[IoU 0.50:0.95]: mmAP: 0.721
+
+
+
+005 [IoU 0.50:0.95]: mmAP: 0.527
+007 [IoU 0.50:0.95]: mmAP: 0.636
+013 [IoU 0.50:0.95]: mmAP: 0.686
+018 [IoU 0.50:0.95]: mmAP: 0.680
+021 [IoU 0.50:0.95]: mmAP: 0.690
+023 [IoU 0.50:0.95]: mmAP: 0.721
+
+
+detect ped in the changan project
+LR: 0.0001
+[RESULT]: Train. Epoch: 31, summary_loss: 0.10923, time: 1.6 mins                  
+[RESULT]: Val. Epoch: 31, summary_loss: 0.18652, time: 0.3 mins        
+
+LR: 3e-05
+[RESULT]: Train. Epoch: 61, summary_loss: 0.10633, time: 1.6 mins                  
+[RESULT]: Val. Epoch: 61, summary_loss: 0.18991, time: 0.3 mins            
+
+just use larger lr which converge faster
+	and it doesn't harm the final loss.

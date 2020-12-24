@@ -219,10 +219,11 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
         json_frame_id = int(tokens[0])
         angle = int(tokens[1]) if len(tokens) > 1 else 0
 
-        if json_frame_id % 20 == 0 and angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
-            continue
-        elif json_frame_id % 20 != 0 and angle not in {0}:
-            continue
+        print(json_frame_id, angle)
+        #if json_frame_id % 20 == 0 and angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
+        #    continue
+        #elif json_frame_id % 20 != 0 and angle not in {0}:
+        #    continue
         #if angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
         #if angle not in {0, 10, 20, 30, 40, 50, 60, 70, 80}:
         #if angle not in {0, 15, 30, 15, 60, 75}:
@@ -238,7 +239,7 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
             start = time.time()
             discarded_track_ids = set()
 
-            if 0:
+            if 1:
                 # Mark objs with refined polygon overlapped as discarded
                 max_iou3 = 0.0
                 for idx_a, obj_a in enumerate(active_tracked_objs.values()):
@@ -287,7 +288,6 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
                 obj = active_tracked_objs[track_id]
                 obj.discarded = True
                 #inactive_tracked_objs[track_id] = obj  # reduce memory consumption
-                active_tracked_objs[track_id].clear()
                 del active_tracked_objs[track_id]
 
             #gc.collect()

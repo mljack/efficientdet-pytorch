@@ -264,27 +264,29 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             end_point = (int(bbox[2]), int(bbox[3])) 
             c = color[obj["crop_idx"]%len(color)] if config.box_color is None else config.box_color
             if 1:
-                c = (0, 0, 255)         #    red: (0.8, 1.0)
+                c = (1, 0, 0)           #    red: (0.8, 1.0)
                 if score < 0.5:         #  green: (0.6, 0.8)
-                    c = (0, 255, 255)   # yellow: (0.0, 0.6)
+                    c = (1, 1, 0)       # yellow: (0.0, 0.6)
                 if score < 0.7:
-                    c = (0, 255, 0)
+                    c = (0, 1, 0)
             if 1:
                 img2 = cv2.rectangle(img2, start_point, end_point, c, 2)
             else:
                 contour = np.array(polygon)
                 img2 = cv2.drawContours(img2, [np.int0(contour)], 0, c, 2)
-            class_name_maps = ["bg", "ped", "bike", "motor"]
+            class_name_maps = ["bg", "car"]
+            #class_name_maps = ["bg", "ped", "bike", "motor"]
             #print(class_id)
             img2 = cv2.putText(img2, class_name_maps[class_id], start_point, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) , 2, cv2.LINE_AA) 
 
-            
+        img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
         if config.save_img:
-            cv2.imwrite(config.img_name, img2)
+            cv2.imwrite(config.img_name, img2 * 255)
         height, width, _ = img2.shape
         if width > 1920:
-            cv2.namedWindow("result", cv2.WINDOW_NORMAL)
-            cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            #cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+            #cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            img2 = cv2.resize(img2, (width//2, height//2))
         cv2.imshow("result", img2)
         k = cv2.waitKey(delay)
         if k == 27:
@@ -397,7 +399,7 @@ def init_net():
     config.box_color = (0,0,255)
     #config.box_color = (0,255,0)
     #config.box_color = (0,255,255)
-    num_classes = 3
+    num_classes = 1
 
     if 0:
         config.crop_size = 512
@@ -415,7 +417,7 @@ def init_net():
         net = load_net(model_name, config.image_scale, num_classes, 'effdet-d3-drone_004_896_1792_bs2_epoch6/best-checkpoint-000epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, 'effdet-d3-drone_004_896_1792_bs2_epoch6/last-checkpoint.bin')
     if 1:
-        config.crop_size = 384
+        config.crop_size = 768
         config.image_scale = 768
         config.overlap_size = 200
         config.batch_size = 32
@@ -433,7 +435,7 @@ def init_net():
         #net = load_net(model_name, config.image_scale, num_classes, '_models/model-013-best-checkpoint-001epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/model-018-best-checkpoint-001epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/model-021-best-checkpoint-002epoch.bin')
-        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-023-best-checkpoint-000epoch.bin')
+        net = load_net(model_name, config.image_scale, num_classes, '_models/model-023-best-checkpoint-000epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped4_384_lr3e-5_bs4_epoch100/best-checkpoint-075epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-241epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-115epoch.bin')
@@ -444,7 +446,7 @@ def init_net():
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-015epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped9_ped_only_lr1e-3/best-checkpoint-010epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-027epoch.bin')
-        net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-000epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-000epoch.bin')
         
     return net, config
 
