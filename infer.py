@@ -13,8 +13,8 @@ from albumentations.pytorch.transforms import ToTensorV2
 import cv2
 import gc
 from matplotlib import pyplot as plt
-from effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
-from effdet.efficientdet import HeadNet
+from .effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
+from .effdet.efficientdet import HeadNet
 
 import warnings
 warnings.simplefilter("ignore")
@@ -33,6 +33,7 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config.image_size = image_scale
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
+    checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
     checkpoint = torch.load(checkpoint_path)
     net.load_state_dict(checkpoint['model_state_dict'])
 
