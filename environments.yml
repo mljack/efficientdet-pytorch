@@ -1,0 +1,23 @@
+name: efficientdet-pytorch-test1
+channels:
+    - conda-forge
+dependencies:
+    - cudatoolkit=10.1
+    - nvidia-apex
+    - opencv
+    - jupyterlab
+    - pandas
+    - scikit-learn
+    - pip:
+        - timm>=0.1.28
+        - torch==1.6.0
+        - torchvision==0.7.0
+        - pycocotools
+        - pyyaml
+        - numpy<=1.17.5
+        - matplotlib
+        - omegaconf>=2.0
+        - ensemble-boxes
+        - opencv-contrib-python
+        - git+http://10.100.10.55/experimental/albumentations
+
