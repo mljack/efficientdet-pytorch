@@ -240,9 +240,12 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
                     box_pts = np.array([[[box[0], box[1]], [box[0], box[3]], [box[2], box[3]], [box[2], box[1]]]])
 
                     polygon = cv2.transform(box_pts, inv_m)[0,:,:]
-                    obj = {"label":float(label), "score":float(scores[k]), "box":box, "polygon":polygon.tolist()}
+                    polygon = polygon.tolist()
+                    polygon = [[round(p[0],4), round(p[1],4)] for p in polygon]
+                    obj = {"label":float(label), "score":float(scores[k]), "polygon":polygon}
                     if config.show_img:
                         obj["crop_idx"] = crop_idx[i]
+                        obj["box"] = box
                     results.append(obj)
                 img = cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0,0,255), 3)
                 
@@ -264,6 +267,8 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             start_point = (int(bbox[0]), int(bbox[1])) 
             end_point = (int(bbox[2]), int(bbox[3])) 
             c = color[obj["crop_idx"]%len(color)] if config.box_color is None else config.box_color
+            del obj["crop_idx"]
+            del obj["box"]
             if 1:
                 c = (1, 0, 0)           #    red: (0.8, 1.0)
                 if score < 0.5:         #  green: (0.6, 0.8)

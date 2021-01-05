@@ -72,26 +72,21 @@ class TrackedObj:
         self.p = obj.p
         self.radius = obj.radius
 
+def dist(a, b):
+    return math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
+
 class Obj:
     def __init__(self, id, obj_json):
         self.json = obj_json
-        box = obj_json["box"]
         self.detection_id = id
         self.label = obj_json["label"]
         self.score = obj_json["score"]
-        if "polygon" in obj_json.keys():
-            pts = obj_json["polygon"]
-        else:
-            pts = ((box[0], box[1]), (box[0], box[3]), (box[2], box[3]), (box[2], box[1]))
+        pts = obj_json["polygon"]
         self.box = pts
         self.poly = Polygon(pts)
-        self.radius = max(abs(box[2]-box[0]), abs(box[3]-box[1]))
+        self.radius = dist(pts[0], pts[2]) * 0.5
         self.p = ((pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) * 0.25,
             (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) * 0.25)
-
-
-def dist(a, b):
-    return math.sqrt((a.p[0]-b.p[0])*(a.p[0]-b.p[0]) + (a.p[1]-b.p[1])*(a.p[1]-b.p[1]))
 
 def max_IoU_obj(obj_a, objs, func):
     max_IoU = 0.01
@@ -219,7 +214,7 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
         json_frame_id = int(tokens[0])
         angle = int(tokens[1]) if len(tokens) > 1 else 0
 
-        print(json_frame_id, angle)
+        #print(json_frame_id, angle)
         #if json_frame_id % 20 == 0 and angle not in {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85}:
         #    continue
         #elif json_frame_id % 20 != 0 and angle not in {0}:
@@ -296,7 +291,6 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
             #summary.print_(sum1)
 
             # Show results
-            #if 0:
             if video_path is not None:
                 for obj in active_tracked_objs.values():
                     pts = np.int32(np.array([(x,y) for x,y in obj.refined_poly.exterior.coords]))
