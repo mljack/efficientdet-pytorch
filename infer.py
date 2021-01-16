@@ -307,8 +307,8 @@ def load_frame(results):
 
 def predict_obb(net, config, img_path = None, img_bytes = None, np_img = None, delay = 1):
     import track
-    angles = [float(v) for v in range(0, 90, 15)]
-    angles = [0.0]
+    angles = [float(v) for v in range(0, 90, 5)]
+    #angles = [0.0]
     results = []
     for angle in angles:
         start = time.time()
@@ -337,8 +337,9 @@ def run(path, angles):
                 continue
             start = time.time()
             img_path = os.path.join(path, item)
-            results = predict(net, config, angle=0.0, img_path=img_path, delay=0)
             output_path = os.path.join(output_base_path, item)
+            config.img_name = output_path[0:output_path.rfind(".")]+".framed.jpg"
+            results = predict(net, config, angle=0.0, img_path=img_path)
             txt_path = output_path[0:output_path.rfind(".")]+".txt" if config.save_result else None
             if txt_path is not None:
                 with open(txt_path, "w") as f:
@@ -384,6 +385,11 @@ def run(path, angles):
             #    continue
             start = time.time()
             json_path = os.path.join(base, "%05d.json" % count) if config.save_result else None
+            if 1:
+                if count % 20 == 0:
+                    angles = [float(a) for a in range(0, 90, 5)]
+                else:
+                    angles = [0.0]
             for angle in angles:
                 result = predict(net, config, angle, np_img=img)
                 if json_path is not None:

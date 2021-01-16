@@ -1,17 +1,28 @@
-video="syq1"
+video="gm4"
 echo ${video}
+echo infer
 date "+%F %H:%M:%S" >> ${video}_log.txt
 python infer.py _videos/${video}.mp4
-python track.py _videos/${video}_objs _videos/${video}.mp4
-python generate_traffichut_csv.py _videos/${video}_objs _videos/${video}.mp4 ${video}.csv
+#python track.py _videos/${video}_objs _videos/${video}.mp4
+#python generate_traffichut_csv.py _videos/${video}_objs _videos/${video}.mp4 ${video}.csv
 date "+%F %H:%M:%S" >> ${video}_log.txt
 
 video="jyq4"
 echo ${video}
+echo infer
 date "+%F %H:%M:%S" >> ${video}_log.txt
 python infer.py _videos/${video}.mp4
-python track.py _videos/${video}_objs _videos/${video}.mp4
-python generate_traffichut_csv.py _videos/${video}_objs _videos/${video}.mp4 ${video}.csv
+#python track.py _videos/${video}_objs _videos/${video}.mp4
+#python generate_traffichut_csv.py _videos/${video}_objs _videos/${video}.mp4 ${video}.csv
+date "+%F %H:%M:%S" >> ${video}_log.txt
+
+video="syq1"
+echo ${video}
+echo infer
+date "+%F %H:%M:%S" >> ${video}_log.txt
+python infer.py _videos/${video}.mp4
+#python track.py _videos/${video}_objs _videos/${video}.mp4
+#python generate_traffichut_csv.py _videos/${video}_objs _videos/${video}.mp4 ${video}.csv
 date "+%F %H:%M:%S" >> ${video}_log.txt
 
 #python track.py _videos/sf6_objs _videos/sf6.mp4

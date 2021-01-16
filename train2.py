@@ -551,6 +551,7 @@ if __name__ == '__main__':
     box_scale = 768
     num_classes = 3
 
+
     datasets = [
         #"0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb",
         #"0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb",
@@ -562,6 +563,8 @@ if __name__ == '__main__':
         #"0016_dataset_ysq1_768_768_obb",
         #"0017_dataset_ysq1_1440_768_obb",
         "a004_dataset_changan001_ped_bike_motor_384_768_3classes"
+        "0018_syq4_dataset_768_768_obb_bus",
+        "0019_gm7_dataset_768_768_obb_bus",
         ]
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
