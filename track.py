@@ -263,7 +263,7 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
                     obj_json = {}
                     obj_json["obj_id"] = obj.track_id
                     if obj.track_id in discarded_track_ids:
-                        obj_json["discarded"] = True
+                        obj_json["discarded"] = 1
                     #obj_json["refined_polygon"] = [[round(x,4), round(y,4)] for x,y in obj.refined_poly.exterior.coords]
                     obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
                         "polygon":[[round(p[0],4), round(p[1],4)]for p in angle_obj.box]}
