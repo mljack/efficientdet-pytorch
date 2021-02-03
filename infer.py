@@ -400,7 +400,7 @@ def run(path, angles):
 def init_net():
     class Config:
         box_color = None
-        show_img = True
+        show_img = False
         save_img = False
         img_name = "save_16.png"
         save_result = True
