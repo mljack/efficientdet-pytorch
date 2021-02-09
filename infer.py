@@ -407,7 +407,7 @@ def run(path, angles, common_vehicle_length=None):
 def init_net():
     class Config:
         box_color = None
-        show_img = True
+        show_img = False
         save_img = False
         img_name = "save_16.png"
         img_suffix = ""
