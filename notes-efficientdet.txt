@@ -56,7 +56,8 @@ python infer.py D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTra
 
 python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset -det D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np
 
-005
+
+model 005
 [IoU 0.50]: mAP: 74.13%
 [IoU 0.55]: mAP: 73.34%
 [IoU 0.60]: mAP: 72.80%
@@ -69,7 +70,7 @@ python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Sour
 [IoU 0.95]: mAP: 0.28%
 [IoU 0.50:0.95]: mmAP: 0.527
 
-007
+model 007
 [IoU 0.50]: mAP: 84.60%
 [IoU 0.55]: mAP: 83.89%
 [IoU 0.60]: mAP: 83.46%
@@ -82,7 +83,7 @@ python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Sour
 [IoU 0.95]: mAP: 2.14%
 [IoU 0.50:0.95]: mmAP: 0.636
 
-013
+model 013
 [IoU 0.50]: mAP: 89.51%
 [IoU 0.55]: mAP: 89.13%
 [IoU 0.60]: mAP: 88.83%
@@ -95,7 +96,7 @@ python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Sour
 [IoU 0.95]: mAP: 2.19%
 [IoU 0.50:0.95]: mmAP: 0.686
 
-018
+model 018
 [IoU 0.50]: mAP: 88.75%
 [IoU 0.55]: mAP: 88.56%
 [IoU 0.60]: mAP: 88.28%
@@ -108,7 +109,7 @@ python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Sour
 [IoU 0.95]: mAP: 1.45%
 [IoU 0.50:0.95]: mmAP: 0.680
 
-021
+model 021
 [IoU 0.50]: mAP: 90.39%
 [IoU 0.55]: mAP: 90.17%
 [IoU 0.60]: mAP: 90.00%
@@ -121,7 +122,7 @@ python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Sour
 [IoU 0.95]: mAP: 1.42%
 [IoU 0.50:0.95]: mmAP: 0.690
 
-023
+model 023
 [IoU 0.50]: mAP: 89.65%
 [IoU 0.55]: mAP: 89.59%
 [IoU 0.60]: mAP: 89.44%
@@ -144,6 +145,9 @@ python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Sour
 023 [IoU 0.50:0.95]: mmAP: 0.721
 
 
+
+==========================================================================================
+
 detect ped in the changan project
 LR: 0.0001
 [RESULT]: Train. Epoch: 31, summary_loss: 0.10923, time: 1.6 mins                  
@@ -155,3 +159,298 @@ LR: 3e-05
 
 just use larger lr which converge faster
 	and it doesn't harm the final loss.
+
+==========================================================================================
+
+python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset -det D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\private_dataset_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np
+
+model 023
+
+private50 (vehicle length: no normalization)
+
+[IoU 0.50]: mAP: 79.38%
+[IoU 0.55]: mAP: 78.74%
+[IoU 0.60]: mAP: 78.28%
+[IoU 0.65]: mAP: 77.75%
+[IoU 0.70]: mAP: 77.10%
+[IoU 0.75]: mAP: 75.42%
+[IoU 0.80]: mAP: 70.31%
+[IoU 0.85]: mAP: 56.75%
+[IoU 0.90]: mAP: 31.75%
+[IoU 0.95]: mAP: 4.92%
+[IoU 0.50:0.95]: mmAP: 0.630
+
+
+private50 (vehicle length: 50)
+
+[IoU 0.50]: mAP: 82.85%
+[IoU 0.55]: mAP: 82.45%
+[IoU 0.60]: mAP: 81.97%
+[IoU 0.65]: mAP: 81.54%
+[IoU 0.70]: mAP: 81.03%
+[IoU 0.75]: mAP: 79.49%
+[IoU 0.80]: mAP: 73.80%
+[IoU 0.85]: mAP: 61.13%
+[IoU 0.90]: mAP: 33.87%
+[IoU 0.95]: mAP: 4.12%
+[IoU 0.50:0.95]: mmAP: 0.662
+
+
+private50 (vehicle length: 60)
+
+[IoU 0.50]: mAP: 83.92%
+[IoU 0.55]: mAP: 83.54%
+[IoU 0.60]: mAP: 82.99%
+[IoU 0.65]: mAP: 82.64%
+[IoU 0.70]: mAP: 82.29%
+[IoU 0.75]: mAP: 80.27%
+[IoU 0.80]: mAP: 74.75%
+[IoU 0.85]: mAP: 60.46%
+[IoU 0.90]: mAP: 34.62%
+[IoU 0.95]: mAP: 4.67%
+[IoU 0.50:0.95]: mmAP: 0.670
+
+
+private50 (vehicle length: 70)
+
+[IoU 0.50]: mAP: 84.23%
+[IoU 0.55]: mAP: 83.63%
+[IoU 0.60]: mAP: 83.32%
+[IoU 0.65]: mAP: 82.75%
+[IoU 0.70]: mAP: 81.86%
+[IoU 0.75]: mAP: 79.24%
+[IoU 0.80]: mAP: 71.97%
+[IoU 0.85]: mAP: 57.16%
+[IoU 0.90]: mAP: 32.52%
+[IoU 0.95]: mAP: 3.86%
+[IoU 0.50:0.95]: mmAP: 0.661
+
+
+private50 (vehicle length: 80)
+
+[IoU 0.50]: mAP: 84.17%
+[IoU 0.55]: mAP: 83.51%
+[IoU 0.60]: mAP: 82.89%
+[IoU 0.65]: mAP: 82.03%
+[IoU 0.70]: mAP: 80.45%
+[IoU 0.75]: mAP: 76.95%
+[IoU 0.80]: mAP: 68.78%
+[IoU 0.85]: mAP: 51.73%
+[IoU 0.90]: mAP: 24.27%
+[IoU 0.95]: mAP: 2.12%
+[IoU 0.50:0.95]: mmAP: 0.637
+
+
+private50 (vehicle length: 90)
+
+[IoU 0.50]: mAP: 82.79%
+[IoU 0.55]: mAP: 82.04%
+[IoU 0.60]: mAP: 81.19%
+[IoU 0.65]: mAP: 79.78%
+[IoU 0.70]: mAP: 78.08%
+[IoU 0.75]: mAP: 73.84%
+[IoU 0.80]: mAP: 64.30%
+[IoU 0.85]: mAP: 44.26%
+[IoU 0.90]: mAP: 17.91%
+[IoU 0.95]: mAP: 1.10%
+[IoU 0.50:0.95]: mmAP: 0.605
+
+------------------------------------------
+model 021
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 83.70%
+[IoU 0.55]: mAP: 83.24%
+[IoU 0.60]: mAP: 82.77%
+[IoU 0.65]: mAP: 82.33%
+[IoU 0.70]: mAP: 81.50%
+[IoU 0.75]: mAP: 78.29%
+[IoU 0.80]: mAP: 69.97%
+[IoU 0.85]: mAP: 51.85%
+[IoU 0.90]: mAP: 25.01%
+[IoU 0.95]: mAP: 1.98%
+[IoU 0.50:0.95]: mmAP: 0.641
+------------------------------------------
+model 005
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 75.76%
+[IoU 0.55]: mAP: 75.00%
+[IoU 0.60]: mAP: 74.27%
+[IoU 0.65]: mAP: 73.40%
+[IoU 0.70]: mAP: 72.07%
+[IoU 0.75]: mAP: 69.47%
+[IoU 0.80]: mAP: 61.89%
+[IoU 0.85]: mAP: 44.38%
+[IoU 0.90]: mAP: 18.65%
+[IoU 0.95]: mAP: 0.92%
+[IoU 0.50:0.95]: mmAP: 0.566
+
+model 007
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 79.37%
+[IoU 0.55]: mAP: 78.64%
+[IoU 0.60]: mAP: 78.06%
+[IoU 0.65]: mAP: 77.47%
+[IoU 0.70]: mAP: 76.31%
+[IoU 0.75]: mAP: 74.35%
+[IoU 0.80]: mAP: 68.88%
+[IoU 0.85]: mAP: 56.17%
+[IoU 0.90]: mAP: 29.02%
+[IoU 0.95]: mAP: 2.31%
+[IoU 0.50:0.95]: mmAP: 0.621
+
+model 013
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 83.03%
+[IoU 0.55]: mAP: 82.73%
+[IoU 0.60]: mAP: 82.35%
+[IoU 0.65]: mAP: 81.78%
+[IoU 0.70]: mAP: 81.16%
+[IoU 0.75]: mAP: 78.44%
+[IoU 0.80]: mAP: 69.72%
+[IoU 0.85]: mAP: 51.34%
+[IoU 0.90]: mAP: 25.69%
+[IoU 0.95]: mAP: 2.49%
+[IoU 0.50:0.95]: mmAP: 0.639
+
+model 018
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 83.01%
+[IoU 0.55]: mAP: 82.62%
+[IoU 0.60]: mAP: 82.19%
+[IoU 0.65]: mAP: 81.54%
+[IoU 0.70]: mAP: 80.83%
+[IoU 0.75]: mAP: 77.94%
+[IoU 0.80]: mAP: 69.45%
+[IoU 0.85]: mAP: 51.30%
+[IoU 0.90]: mAP: 24.11%
+[IoU 0.95]: mAP: 1.40%
+[IoU 0.50:0.95]: mmAP: 0.634
+
+model 021
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 83.70%
+[IoU 0.55]: mAP: 83.24%
+[IoU 0.60]: mAP: 82.77%
+[IoU 0.65]: mAP: 82.33%
+[IoU 0.70]: mAP: 81.50%
+[IoU 0.75]: mAP: 78.29%
+[IoU 0.80]: mAP: 69.97%
+[IoU 0.85]: mAP: 51.85%
+[IoU 0.90]: mAP: 25.01%
+[IoU 0.95]: mAP: 1.98%
+[IoU 0.50:0.95]: mmAP: 0.641
+
+model 023
+private50 (vehicle length: 60)
+[IoU 0.50]: mAP: 83.92%
+[IoU 0.55]: mAP: 83.54%
+[IoU 0.60]: mAP: 82.99%
+[IoU 0.65]: mAP: 82.64%
+[IoU 0.70]: mAP: 82.29%
+[IoU 0.75]: mAP: 80.27%
+[IoU 0.80]: mAP: 74.75%
+[IoU 0.85]: mAP: 60.46%
+[IoU 0.90]: mAP: 34.62%
+[IoU 0.95]: mAP: 4.67%
+[IoU 0.50:0.95]: mmAP: 0.670
+
+
+private50 with incorrect weighted box fusion 0.01 0.009
++--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+-------+
+|  model |   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95 |
++--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+-------+
+| 005 60 | 75.76% | 75.00% | 74.27% | 73.40% | 72.07% | 69.47% | 61.89% | 44.38% | 18.65% |  0.92% | 56.6% |
+| 007 60 | 79.37% | 78.64% | 78.06% | 77.47% | 76.31% | 74.35% | 68.88% | 56.17% | 29.02% |  2.31% | 62.1% |
+| 013 60 | 83.03% | 82.73% | 82.35% | 81.78% | 81.16% | 78.44% | 69.72% | 51.34% | 25.69% |  2.49% | 63.9% |
+| 018 60 | 83.01% | 82.62% | 82.19% | 81.54% | 80.83% | 77.94% | 69.45% | 51.30% | 24.11% |  1.40% | 63.4% |
+| 021 60 | 83.70% | 83.24% | 82.77% | 82.33% | 81.50% | 78.29% | 69.97% | 51.85% | 25.01% |  1.98% | 64.1% |
+| 023 60 | 83.92% | 83.54% | 82.99% | 82.64% | 82.29% | 80.27% | 74.75% | 60.46% | 34.62% |  4.67% | 67.0% |
++--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+-------+
+
+private50 without weighted box fusion
++--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+|  model |   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
++--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+| 005 60 | 85.98% | 85.56% | 85.18% | 84.46% | 83.23% | 80.44% | 71.86% | 52.20% | 21.82% |  1.00% | 65.17% |
+| 007 60 | 92.04% | 91.81% | 91.36% | 90.75% | 89.66% | 87.54% | 81.24% | 66.21% | 34.68% |  2.86% | 72.81% |
+| 013 60 | 95.36% | 95.27% | 94.94% | 94.38% | 93.69% | 90.75% | 81.13% | 60.42% | 30.18% |  2.71% | 73.88% |
+| 018 60 | 94.62% | 94.44% | 94.30% | 93.75% | 92.97% | 89.75% | 80.45% | 59.86% | 28.15% |  1.69% | 73.00% |
+| 021 60 | 95.35% | 95.13% | 94.78% | 94.37% | 93.39% | 90.00% | 80.38% | 60.58% | 29.52% |  2.35% | 73.58% |
+| 023 60 | 96.39% | 96.32% | 96.06% | 95.61% | 95.21% | 92.99% | 86.76% | 71.14% | 40.31% |  5.05% | 77.58% |
++--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+
+private50
+model 023 vehicle size 60
+without weighted box fusion
+| 96.39% | 96.32% | 96.06% | 95.61% | 95.21% | 92.99% | 86.76% | 71.14% | 40.31% |  5.05% | 77.58% |
+with weighted box fusion
+iou_thr=0.5 skip_box_thr=0.009
+| 96.39% | 96.32% | 96.06% | 95.61% | 95.21% | 92.99% | 86.76% | 71.14% | 40.31% |  5.05% | 77.58% |
+iou_thr=0.44 skip_box_thr=0.009
+| 95.85% | 95.82% | 95.61% | 95.21% | 94.81% | 92.67% | 86.48% | 70.91% | 40.22% |  5.03% | 77.26% |
+iou_thr=0.44 skip_box_thr=0.0
+| 96.33% | 96.26% | 95.99% | 95.56% | 95.14% | 92.86% | 86.50% | 70.73% | 40.03% |  5.03% | 77.44% |
+iou_thr=0.55 skip_box_thr=0.0
+| 96.39% | 96.32% | 96.06% | 95.61% | 95.21% | 92.99% | 86.76% | 71.14% | 40.31% |  5.05% | 77.58% |
+iou_thr=0.55 skip_box_thr=0.1
+| 96.39% | 96.32% | 96.06% | 95.61% | 95.21% | 92.99% | 86.76% | 71.14% | 40.31% |  5.05% | 77.58% |
+
+model 005 vehicle size 60
+without weighted box fusion
+| 85.98% | 85.56% | 85.18% | 84.46% | 83.23% | 80.44% | 71.86% | 52.20% | 21.82% |  1.00% | 65.17% |
+iou_thr=0.55 skip_box_thr=0.1
+| 85.98% | 85.56% | 85.18% | 84.46% | 83.23% | 80.44% | 71.86% | 52.20% | 21.82% |  1.00% | 65.17% |
+iou_thr=0.44 skip_box_thr=0.1
+| 85.79% | 85.39% | 84.82% | 83.99% | 82.67% | 79.75% | 70.89% | 51.27% | 21.50% |  0.99% | 64.71% |
+iou_thr=0.44 skip_box_thr=0.43
+| 84.52% | 84.18% | 83.78% | 83.20% | 82.09% | 79.52% | 71.09% | 51.67% | 21.69% |  1.00% | 64.27% |
+
+private50
+model 023 no vehicle size normalization
+| 90.17% | 90.07% | 89.80% | 89.26% | 88.40% | 86.24% | 80.53% | 64.80% | 35.60% |  5.19% | 72.01% |
+	much more false positive and uncertain predictions
+model 023, no weighted box fusion, vehicle size normalizated to 50
+| 96.08% | 95.94% | 95.69% | 95.35% | 94.80% | 92.92% | 86.84% | 72.37% | 40.06% |  4.53% | 77.46% |
+model 023, no weighted box fusion, vehicle size normalizated to 60
+| 96.39% | 96.32% | 96.06% | 95.61% | 95.21% | 92.99% | 86.76% | 71.14% | 40.31% |  5.05% | 77.58% |
+model 023, no weighted box fusion, vehicle size normalizated to 70
+| 96.04% | 95.94% | 95.60% | 94.99% | 93.89% | 91.07% | 83.15% | 66.36% | 37.57% |  4.17% | 75.88% |
+
+so the hyper-parameter best choice is still
+	without weighted box fusion, vehicle size normalizated to 60 pixels
+
+
+45度两车并排
+45度大小车并排
+相互交重的识别框相互干扰
+	weighted box fusion
+		iou threshold 0.01 不正确
+			0.55 或不用weighted box fusion private50上都能得到最好mmAP
+
+现有效果改进
+	提高识别速度
+	个别超长车辆可能因crop被切断
+	大车识别框有时不够准确
+	有较多误识别
+	稀有车辆
+
+添加功能
+	车辆种类、颜色、车型、属性
+	OBB
+	倾斜拍摄
+		低角度视角结果还很差
+
+测试gm7查看大车准确度
+	soso
+阴影下车辆准确度
+模型集成?
+整理数据集
+整理航拍视频
+
+python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\web-collection-001-002_dataset -det D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\web-collection-001-002_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np 60
+
+web-collection-001-002
+model 023 no vehicle size normalization
+| 78.82% | 77.89% | 76.91% | 75.25% | 72.49% | 67.56% | 56.65% | 38.80% | 16.79% |  1.57% | 56.27% |
+model 023, no weighted box fusion, vehicle size normalizated to 60
+| 91.06% | 90.49% | 89.79% | 88.62% | 86.29% | 81.31% | 71.25% | 50.14% | 23.17% |  1.97% | 67.41% |
