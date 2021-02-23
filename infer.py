@@ -2,6 +2,8 @@ import json
 import time
 import os
 import sys
+import math
+import pprint
 from ensemble_boxes import *
 import torch
 import numpy as np
@@ -287,6 +289,7 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
         if config.save_img:
             cv2.imwrite(config.img_name, img2 * 255)
         height, width, _ = img2.shape
+        print(img2.shape)
         if width > 1920:
             #cv2.namedWindow("result", cv2.WINDOW_NORMAL)
             #cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -303,9 +306,12 @@ def load_frame(results):
         yield "00000_%d.json" % int(angle), objs
     yield "00001_0.json", []
 
-def predict_obb(net, config, img_path = None, img_bytes = None, np_img = None, delay = 1):
+def dist2(p1, p2):
+    return (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2
+
+def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np_img = None, delay = 1):
     import track
-    angles = [float(v) for v in range(0, 90, 5)]
+    angles = [float(v) for v in range(0, 90, angle_step)]
     #angles = [0.0]
     results = []
     for angle in angles:
@@ -316,6 +322,54 @@ def predict_obb(net, config, img_path = None, img_bytes = None, np_img = None, d
     objs = track.track(load_frame(results), single_frame_obb = True)
     print(len(objs))
     return objs
+
+def find_the_right_crop_size(net, config, common_vehicle_length, img_path = None, img_bytes = None, np_img = None, delay = 1):
+    from sklearn.cluster import KMeans
+
+    angle_step = 15
+    angles = [float(v) for v in range(0, 90, angle_step)]
+    settings = [384, 768, 768*2, 768*3, 768*4, 768*5]
+    boxes = []
+    if img_path is not None:
+        np_img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        #w, h, _ = np_img.shape
+        #if w > 2000 and h > 1000:
+        #    np_img = np_img[w//2-995:w//2+995, h//2-495:h//2+495]
+        #elif w > 1000 and h > 2000:
+        #    np_img = np_img[w//2-495:w//2+495, h//2-995:h//2+995]
+        img_path = None
+    for crop_size in settings:
+        config.crop_size = crop_size
+        config.overlap_size = int(crop_size * 200.0 / 768.0) // 2 * 2
+        print(img_path)
+        result = predict_obb(net, config, angle_step, img_path=img_path, img_bytes=img_bytes, np_img=np_img, delay=delay)
+        for obj in result:
+            if len(obj["boxes"]) < len(angles)*0.6:
+                continue
+            area2_min = 1e20
+            for box in obj["boxes"]:
+                if box["score"] < 0.7:
+                    continue
+                polyon = box["polygon"]
+                width2 = dist2(polyon[0], polyon[1])
+                length2 = dist2(polyon[1], polyon[2])
+                area2 = width2 * length2
+                if area2 < area2_min:
+                    area2_min = area2
+                    if length2 < width2:
+                        length, width = math.sqrt(width2) , math.sqrt(length2)  # swap
+                    else:
+                        length, width = math.sqrt(length2) , math.sqrt(width2)
+            if area2_min != 1e20:
+                boxes.append([length, width])
+    if len(boxes) < 3:
+        return 768
+    kmeans = KMeans(n_clusters=3, random_state=0).fit(boxes)
+    print(kmeans.cluster_centers_)
+    print(np.bincount(kmeans.labels_))
+    common_box = kmeans.cluster_centers_[np.argmax(np.bincount(kmeans.labels_))]
+    print(common_box)
+    return int(768.0 * common_box[0] / common_vehicle_length)
 
 def run(path, angles, common_vehicle_length=None):
     net, config = init_net()
@@ -329,31 +383,86 @@ def run(path, angles, common_vehicle_length=None):
         output_base_path = path + "_det"
         if not os.path.isdir(output_base_path):
             os.mkdir(output_base_path)
-        config.save_img = True
         for item in os.listdir(path):
             ext = item[item.rfind(".")+1:]
             if ext.lower() not in ("png", "jpg", "jpeg", "bmp"):
                 continue
-            start = time.time()
+
+            print(item)
             img_path = os.path.join(path, item)
             output_path = os.path.join(output_base_path, item)
-            config.img_name = output_path[0:output_path.rfind(".")]+config.img_suffix+".jpg"
+
+            if config.want_obb_result:
+                marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
+                if marker_path is not None and os.path.exists(marker_path):
+                    continue
+
+            start = time.time()
+            config.img_name = output_path[0:output_path.rfind(".")]+".jpg"
             if common_vehicle_length is not None:
                 attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
-                with open(attrs_json_path) as f:
-                    attrs = json.load(f)
-                config.crop_size = int(768.0 * attrs["MostCommonVehicleLengthInPixels"] / common_vehicle_length)
+                config.save_img = False
+                if os.path.exists(attrs_json_path):
+                    with open(attrs_json_path) as f:
+                        attrs = json.load(f)
+                    config.crop_size = int(768.0 * attrs["MostCommonVehicleLengthInPixels"] / common_vehicle_length)
+                else:
+                    config.crop_size = find_the_right_crop_size(net, config, common_vehicle_length, img_path=img_path, delay=1)
                 config.overlap_size = int(config.crop_size * 200.0 / 768.0) // 2 * 2
                 print("crop: %d/%d" % (config.overlap_size, config.crop_size))
-            config.img_name = output_path[0:output_path.rfind(".")]+".jpg"
-            results = predict(net, config, angle=0.0, img_path=img_path, want_aabb=True, delay=1)
-            txt_path = output_path[0:output_path.rfind(".")]+".txt" if config.save_result else None
-            if txt_path is not None:
-                with open(txt_path, "w") as f:
-                    for result in results:
-                        box = result["box"]
-                        f.write("vehicle %f %f %f %f %f\n" % (result["score"], box[0], box[1], box[2], box[3]))
-            print("[%s]: Found %3d vehicles in %.3fs" % (item, len(results), time.time() - start))
+            if config.want_obb_result:
+                angle_step = 5
+                results = predict_obb(net, config, angle_step, img_path=img_path, delay=1)
+                markers = []
+                id = -1
+                for obj in results:
+                    if len(obj["boxes"]) < 90 // angle_step * 0.5:
+                        continue
+                    id += 1
+                    area2_min = 999999999999.0
+                    min_box = None
+                    for box in obj["boxes"]:
+                        polyon = box["polygon"]
+                        area2 = dist2(polyon[0], polyon[1]) * dist2(polyon[1], polyon[2])
+                        if area2 < area2_min:
+                            area2_min = area2
+                            min_box = box
+
+                    width = math.sqrt(dist2(min_box["polygon"][0], min_box["polygon"][1]))
+                    length = math.sqrt(dist2(min_box["polygon"][1], min_box["polygon"][2]))
+                    angle = float(min_box["angle"])
+                    if width > length:
+                        width, length = length, width
+                        angle += 90.0
+                    x = (min_box["polygon"][0][0] + min_box["polygon"][2][0]) * 0.5
+                    y = (min_box["polygon"][0][1] + min_box["polygon"][2][1]) * 0.5
+                    m = {
+                        "frame_id": 0,
+                        "heading_angle": angle,
+                        "id": id,
+                        "width": width,
+                        "length": length,
+                        "manually_keyed": True,
+                        "score": min_box["score"],
+                        "x": x,
+                        "y": y
+                    }
+                    markers.append([m])
+                marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
+                if marker_path is not None:
+                    with open(marker_path, "w") as f:
+                        f.write(pprint.pformat(markers, width=300, indent=1).replace("'", "\"").replace("True", "true"))
+
+            else:
+                config.save_img = True
+                results = predict(net, config, angle=0.0, img_path=img_path, want_aabb=True, delay=1)
+                txt_path = output_path[0:output_path.rfind(".")]+".txt" if config.save_result else None
+                if txt_path is not None:
+                    with open(txt_path, "w") as f:
+                        for result in results:
+                            box = result["box"]
+                            f.write("vehicle %f %f %f %f %f\n" % (result["score"], box[0], box[1], box[2], box[3]))
+                print("[%s]: Found %3d vehicles in %.3fs" % (item, len(results), time.time() - start))
         return
  
     ext = path[path.rfind(".")+1:]
@@ -412,6 +521,7 @@ def init_net():
         img_name = "save_16.png"
         img_suffix = ""
         save_result = True
+        want_obb_result = True
         result_format = "json"
         #result_format = "txt"
 

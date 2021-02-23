@@ -447,10 +447,31 @@ so the hyper-parameter best choice is still
 整理数据集
 整理航拍视频
 
+pickup
+frontview
+multi-section bus/truck
+dump truck
+empty truck
+side view
+black car with hard shadow
+
 python pascalvoc.py -gt D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\web-collection-001-002_dataset -det D:\git\CyTrafficEditor\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\web-collection-001-002_det -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np 60
 
 web-collection-001-002
 model 023 no vehicle size normalization
 | 78.82% | 77.89% | 76.91% | 75.25% | 72.49% | 67.56% | 56.65% | 38.80% | 16.79% |  1.57% | 56.27% |
-model 023, no weighted box fusion, vehicle size normalizated to 60
+model 023, no weighted box fusion, vehicle size normalizated to 60 (web-collection-001-002_old 64 pics)
 | 91.06% | 90.49% | 89.79% | 88.62% | 86.29% | 81.31% | 71.25% | 50.14% | 23.17% |  1.97% | 67.41% |
+
+model 023, no weighted box fusion, vehicle size normalizated to 60 (web-collection-001-002_ 92 pics)
+| 91.72% | 91.44% | 90.77% | 89.69% | 87.76% | 83.27% | 73.10% | 52.12% | 23.07% |  1.51% | 68.44% |
+
+
+数量
+清晰程度
+
+批量下载
+批量识别
+识别效果差优先标注
+数据集构建，分阶段
+训练中评价自动（多数据集）
