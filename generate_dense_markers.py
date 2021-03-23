@@ -16,42 +16,32 @@ def dot(p1, p2):
 def deg2rad(v):
     return v / 180.0 * 3.14159265
 
+def rad2deg(v):
+    return v / 3.14159265 * 180.0
+
 class State:
-    def __init__(self, frame_id, time, boxes):
+    def __init__(self, frame_id, time, state):
         self.frame_id = frame_id
         self.time = time
-        self.speed = 0
-        self.arctan = 0
-        self.heading_angle = None
-        self.length = None
-        self.width = None
-
-        box = boxes[0]  # Use 0 angle bbox to determine vehicle location
-        polyon = box["polygon"]
-        self.x = (polyon[0][0] + polyon[1][0] + polyon[2][0] + polyon[3][0]) * 0.25
-        self.y = (polyon[0][1] + polyon[1][1] + polyon[2][1] + polyon[3][1]) * 0.25
-
-        # Use angle of min area bounding box as the heading_angle of vehicles
-        if len(boxes) > 1:
-            min_area2 = 1e100
-            min_box = None
-            for box in boxes:
-                polyon = box["polygon"]
-                area2 = dist2(polyon[0], polyon[1]) * dist2(polyon[1], polyon[2])
-                if area2 < min_area2:
-                    min_area2 = area2
-                    min_box = box
-            self.heading_angle = float(min_box["angle"])
-            polyon = min_box["polygon"]
+        center = state["center"]
+        self.x = center[0]
+        self.y = center[1]
+        if state["angle"] != 9999.0:
+            polyon = state["poly"]
             self.width = math.sqrt(dist2(polyon[0], polyon[1]))
             self.length = math.sqrt(dist2(polyon[1], polyon[2]))
+            self.heading_angle = rad2deg(math.atan2(polyon[2][1]-polyon[1][1], polyon[2][0]-polyon[1][0]))
             if self.length < self.width:
                 self.length, self.width = self.width , self.length  # swap
                 self.heading_angle += 90.0
             while self.heading_angle > 360.0:
                 self.heading_angle -= 360.0
             while self.heading_angle < 0.0:
-                self.heading_angle += 360.0
+                self.heading_angle += 360.0        
+        else:
+            self.heading_angle = None
+            self.length = None
+            self.width = None
 
 class Obj:
     def __init__(self, id):
@@ -59,7 +49,7 @@ class Obj:
         self.type = 1
         self.states = []
 
-def generate(objs_base_path, video_path, csv_path, out_json_path):
+def generate(objs_base_path, video_path, csv_path):
     video = cv2.VideoCapture(video_path)
     fps = video.get(cv2.CAP_PROP_FPS)
     video.release()
@@ -84,13 +74,15 @@ def generate(objs_base_path, video_path, csv_path, out_json_path):
             id = obj_json["obj_id"]
             if id not in objs:
                 objs[id] = Obj(id)
-            objs[id].states.append(State(json_frame_id, time, obj_json["boxes"]))
+            objs[id].states.append(State(json_frame_id, time, obj_json))
 
     markers = collections.OrderedDict()
 
     for idx, obj in enumerate(objs.values()):
         for s in obj.states:
             if s.heading_angle is None or s.length is None or s.width is None:
+                continue
+            if s.heading_angle == 9999.0 or s.length == 9999.0 or s.width == 9999.0:
                 continue
             if idx not in markers:
                 markers[idx] = collections.OrderedDict()
@@ -129,7 +121,7 @@ def generate(objs_base_path, video_path, csv_path, out_json_path):
                         heading_angle -= 360.0
                     marker["heading_angle"] = heading_angle
 
-    #with open(out_json_path, "w") as f:
+    #with open(csv_path.replace(".csv", ".vehicle_markers.json"), "w") as f:
     #    f.write(pprint.pformat([list(marker.values())for marker in markers.values()], width=200, indent=1).replace("'", "\"").replace("True", "true"))
 
     # Export to data-from-sky CSV for CyTrafficEditor
@@ -169,6 +161,6 @@ def generate(objs_base_path, video_path, csv_path, out_json_path):
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print("Usage: python generate_dense_markers.py detection-folder video.mp4 out.csv out.vehicle_markers.json")
+        print("Usage: python generate_dense_markers.py detection-folder video.mp4 out.csv")
     else:
-        generate(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+        generate(sys.argv[1], sys.argv[2], sys.argv[3])
