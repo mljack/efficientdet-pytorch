@@ -15,6 +15,9 @@ import pprint
 #import gc
 #from pympler import muppy, summary
 
+def dist2(a, b):
+    return (a[0]-b[0])**2 + (a[1]-b[1])**2
+
 def IoU(b1, b2):
     intersection = [max(b1[0], b2[0]), max(b1[1], b2[1]), min(b1[2], b2[2]), min(b1[3], b2[3])]
     if intersection[2] < intersection[0] or intersection[3] < intersection[1]:
@@ -176,6 +179,64 @@ def read_json_objs(base_path):
             yield item, json.load(f)
     yield "99999_000.json", None
 
+def compute_attrs(obj):
+    boxes = obj["boxes"]
+    if len(boxes) == 1:
+        poly = boxes[0]["polygon"]
+        obj["poly"] = poly
+        x = (poly[0][0]+poly[1][0]+poly[2][0]+poly[3][0]) * 0.25
+        y = (poly[0][1]+poly[1][1]+poly[2][1]+poly[3][1]) * 0.25
+        obj["center"] = [round(x, 4), round(y, 4)]
+        obj["angle"] = 9999.0
+        obj["length"] = 9999.0
+        obj["width"] = 9999.0
+        obj["score"] = boxes[0]["score"]
+    else:
+        min_area2 = 99999999999.0
+        min_area_angle = None
+        min_area_length2 = None
+        min_area_width2 = None
+        min_area_poly = None
+        min_area_score = None
+        aabb = None
+        aabb_score = None
+        for box in boxes:
+            angle = box["angle"]
+            poly = box["polygon"]
+            if angle == 0.0:
+                aabb = poly
+                aabb_score = box["score"]
+            length2 = dist2(poly[0], poly[1])
+            width2 = dist2(poly[1], poly[2])
+            area2 = length2 * width2
+            if area2 < min_area2:
+                min_area2 = area2
+                min_area_angle = angle
+                min_area_length2 = length2
+                min_area_width2 = width2
+                min_area_poly = poly
+                min_area_score = box["score"]
+        if min_area_length2 < min_area_width2:
+            min_area_width2, min_area_length2 = (min_area_length2, min_area_width2)
+            min_area_angle += 90.0
+        poly = min_area_poly
+        x = (poly[0][0]+poly[1][0]+poly[2][0]+poly[3][0]) * 0.25
+        y = (poly[0][1]+poly[1][1]+poly[2][1]+poly[3][1]) * 0.25
+        poly = min_area_poly if aabb is None else aabb
+        obj["score"] = min_area_score if aabb_score is None else aabb_score
+        obj["poly"] = min_area_poly
+        obj["center"] = [round(x, 4), round(y, 4)]
+        obj["angle"] = min_area_angle
+        obj["length"] = round(math.sqrt(min_area_length2), 4)
+        obj["width"] = round(math.sqrt(min_area_width2), 4)
+    min_x = min(poly[0][0], poly[1][0], poly[2][0], poly[3][0])
+    min_y = min(poly[0][1], poly[1][1], poly[2][1], poly[3][1])
+    max_x = max(poly[0][0], poly[1][0], poly[2][0], poly[3][0])
+    max_y = max(poly[0][1], poly[1][1], poly[2][1], poly[3][1])
+    obj["aabb"] = [[min_x, min_y], [max_x, max_y]]
+    obj["label"] = 1.0
+    del obj["boxes"]
+
 def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
     track_count = 0
 
@@ -268,11 +329,12 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
                     obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
                         "polygon":[[round(p[0],4), round(p[1],4)]for p in angle_obj.box]}
                         for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
+                    compute_attrs(obj_json)
                     frame_json.append(obj_json)
                 if output_path is not None:
                     json_path = os.path.join(output_path, "%05d.tracked.json" % json_frame_id_old)
                     with open(json_path, 'w') as f:
-                        f.write(pprint.pformat(frame_json, width=200, indent=1).replace("'", "\""))
+                        f.write(pprint.pformat(frame_json, width=400, indent=1).replace("'", "\""))
                         #json.dump(frame_json, f)
                 if single_frame_obb:
                     return frame_json
