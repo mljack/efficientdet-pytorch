@@ -23,7 +23,8 @@ warnings.simplefilter("ignore")
 
 def get_valid_transforms(image_scale):
     return A.Compose([
-            #A.Resize(height=image_scale, width=image_scale, p=1.0),
+            #A.CLAHE(p=1.0),
+            A.Resize(height=image_scale, width=image_scale, p=1.0),
             ToTensorV2(p=1.0),
         ], p=1.0)
 
@@ -35,7 +36,8 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config.image_size = image_scale
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
+    if not os.path.isabs(checkpoint_path):
+        checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
     checkpoint = torch.load(checkpoint_path)
     net.load_state_dict(checkpoint['model_state_dict'])
 
@@ -47,7 +49,8 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     return net.cuda()
 
 def make_predictions(images, net, score_threshold=0.22):
-    images = torch.stack(images).cuda().float()
+    #ori_images = images
+    images = torch.stack(images).float().cuda() / 255.0
     predictions = []
     with torch.no_grad():
         img_scale = torch.tensor([1]*images.shape[0]).float().cuda()
@@ -55,6 +58,13 @@ def make_predictions(images, net, score_threshold=0.22):
         img_size = torch.tensor(img_size).float().cuda()
         det = net(images, img_scale, img_size)
         for i in range(images.shape[0]):
+            if 0:
+                a = ori_images[i].permute(1,2,0).cpu().numpy()
+                cv2.imshow("image", cv2.cvtColor(a, cv2.COLOR_BGR2RGB))
+                k = cv2.waitKey()
+                if k == 27:
+                    exit(0)
+
             d = det[i].detach().cpu().numpy()
             boxes = d[:,:4]    
             scores = d[:,4]
@@ -154,8 +164,9 @@ class DatasetRetriever(Dataset):
             self.img = cv2.imread(self.path, cv2.IMREAD_COLOR)
         if np_img is not None:
             self.img = np_img
-        self.img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB).astype(np.float32)
-        self.img /= 255.0
+        self.img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
+        #self.img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB).astype(np.float32)
+        #self.img /= 255.0
         
         self.original_img = self.img.copy()
         self.img, self.angle_transform = rotate_im(self.img, angle)
@@ -185,7 +196,7 @@ class DatasetRetriever(Dataset):
             self.idx_w = 0
             self.idx_h += 1
         
-        crop_img = np.zeros((self.crop_size, self.crop_size,3), np.float32)
+        crop_img = np.zeros((self.crop_size, self.crop_size,3), np.uint8)
         crop_img2 = self.img[base_y:min(base_y+self.crop_size,self.height), base_x:min(base_x+self.crop_size,self.width)]
         crop_img[0:crop_img2.shape[0], 0:crop_img2.shape[1]] = crop_img2
         if self.input_size != self.crop_size:
@@ -289,7 +300,7 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
         if config.save_img:
             cv2.imwrite(config.img_name, img2 * 255)
         height, width, _ = img2.shape
-        print(img2.shape)
+        #print(img2.shape)
         if width > 1920:
             #cv2.namedWindow("result", cv2.WINDOW_NORMAL)
             #cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -371,8 +382,8 @@ def find_the_right_crop_size(net, config, common_vehicle_length, img_path = None
     print(common_box)
     return int(768.0 * common_box[0] / common_vehicle_length)
 
-def run(path, angles, common_vehicle_length=None):
-    net, config = init_net()
+def run(path, angles, common_vehicle_length=None, model_path=None):
+    net, config = init_net(model_path)
 
     if len(angles) == 0:
         angles = [0.0]
@@ -402,6 +413,7 @@ def run(path, angles, common_vehicle_length=None):
             if common_vehicle_length is not None:
                 attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
                 config.save_img = False
+                print(attrs_json_path)
                 if os.path.exists(attrs_json_path):
                     with open(attrs_json_path) as f:
                         attrs = json.load(f)
@@ -513,15 +525,15 @@ def run(path, angles, common_vehicle_length=None):
                         json.dump(result, f, indent=1)
             print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
 
-def init_net():
+def init_net(model_path = None):
     class Config:
         box_color = None
-        show_img = False
+        show_img = True
         save_img = False
         img_name = "save_16.png"
         img_suffix = ""
         save_result = True
-        want_obb_result = True
+        want_obb_result = False
         result_format = "json"
         #result_format = "txt"
 
@@ -566,7 +578,7 @@ def init_net():
         #net = load_net(model_name, config.image_scale, num_classes, '_models/model-013-best-checkpoint-001epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/model-018-best-checkpoint-001epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/model-021-best-checkpoint-002epoch.bin')
-        net = load_net(model_name, config.image_scale, num_classes, '_models/model-023-best-checkpoint-000epoch.bin')
+        #net = load_net(model_name, config.image_scale, num_classes, '_models/model-023-best-checkpoint-000epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped4_384_lr3e-5_bs4_epoch100/best-checkpoint-075epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-241epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped7_ped_only_lr1e-4/best-checkpoint-115epoch.bin')
@@ -578,19 +590,24 @@ def init_net():
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_ped9_ped_only_lr1e-3/best-checkpoint-010epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-027epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-000epoch.bin')
+        if model_path is None:
+            net = load_net(model_name, config.image_scale, num_classes, '_models/effdet-d2-drone_/best-checkpoint-000epoch.bin')
+        else:
+            net = load_net(model_name, config.image_scale, num_classes, model_path)
+
         
     return net, config
 
 def main():
     if torch.cuda.device_count() > 1:
-        torch.cuda.set_device(0)
+        torch.cuda.set_device(1)
         print("Select [%s]" % torch.cuda.get_device_name(torch.cuda.current_device()))
 
     print(sys.argv)
-    if len(sys.argv) < 2 or len(sys.argv) > 3:
-        print("Usage: python infer.py test.jpg [60.0]")
+    if len(sys.argv) < 2 or len(sys.argv) > 4:
+        print("Usage: python infer.py test.jpg [60.0] []")
     else:
-        run(sys.argv[1], [], common_vehicle_length=(float(sys.argv[2]) if len(sys.argv) > 2 else None))
+        run(sys.argv[1], [], common_vehicle_length=(float(sys.argv[2]) if len(sys.argv) > 2 else None), model_path=(sys.argv[3] if len(sys.argv) > 3 else None))
 
 if __name__ == '__main__':
     main()

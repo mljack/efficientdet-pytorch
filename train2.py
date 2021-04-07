@@ -76,7 +76,7 @@ def obb_to_aabb(bbox, **kwargs):
 def get_train_transforms():
     return A.Compose(
         [
-            #A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.5),
+            A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.5),
             A.Lambda(bbox=obb_to_aabb, always_apply=True, use_obb=True, p=1.0),
         ], 
         p=1.0, 
@@ -91,21 +91,22 @@ def get_train_transforms():
 def get_train_transforms2(img_scale):
     return A.Compose(
         [
+            #A.CLAHE(p=0.3),
             #A.ColorJitter(brightness=0.2, contrast=0.5, saturation=0.2, hue=0.3, p=0.5),
             #A.HueSaturationValue(hue_shift_limit=0.3, sat_shift_limit=0.3, val_shift_limit=0.3, p=0.9),
             #A.OneOf([
             #    A.HueSaturationValue(hue_shift_limit=0.5, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.9),
             #    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.9),
             #],p=0.9),
-            #A.OneOf([
-            #    A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.05, p=0.95),
-            #    A.ToGray(p=0.05),
-            #],p=0.9),
-            #A.GaussianBlur(p=0.2),
+            A.OneOf([
+                A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.05, p=0.95),
+                A.ToGray(p=0.05),
+            ],p=0.9),
+            A.GaussianBlur(p=0.2),
             #A.ChannelShuffle(p=1.0),
             #A.ToGray(p=0.3),
             A.HorizontalFlip(p=0.5),
-            #A.VerticalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
             #A.Resize(height=img_scale, width=img_scale, p=1.0),
             #A.Cutout(num_holes=4, max_h_size=32, max_w_size=32, fill_value=0, p=1.0),
             ToTensorV2(p=1.0),
@@ -135,6 +136,7 @@ def get_valid_transforms():
 def get_valid_transforms2(img_scale):
     return A.Compose(
         [
+            #A.CLAHE(p=1.0),
             A.Resize(height=img_scale, width=img_scale, p=1.0),
             ToTensorV2(p=1.0),
         ], 
@@ -174,8 +176,9 @@ class DatasetRetriever(Dataset):
         img_id = self.img_ids[index]
         path = os.path.join(self.root,  self.img_names[index])
         image = cv2.imread(path, cv2.IMREAD_COLOR)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
-        image /= 255.0
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        #image /= 255.0
 
         with open(path.replace(".jpg", ".txt")) as f:
             lines = f.readlines()
@@ -183,8 +186,8 @@ class DatasetRetriever(Dataset):
         cls_ids = []
         for i, line in enumerate(lines):
             values = [float(token) for token in line.replace("\n", "").split(" ")]
-            if int(values[0]) != 8 and i+1 != len(lines):
-                continue
+            #if int(values[0]) != 8 and i+1 != len(lines):
+            #    continue
             bbox = [(values[1]-values[3]*0.5)*self.box_scale, (values[2]-values[4]*0.5)*self.box_scale,
                     (values[1]+values[3]*0.5)*self.box_scale, (values[2]+values[4]*0.5)*self.box_scale, values[5]+360.0 if values[5] < 0 else values[5]]
             boxes.append(bbox)
@@ -256,6 +259,28 @@ class Logger:
         with open(self.log_path, 'a+') as f:
             f.write(f'{message}\n')
 
+import shutil
+import subprocess
+
+def eval_mAP(test_datasets, model_path):
+    model_path = os.path.abspath(model_path)
+    output_path = os.path.split(model_path)[0]
+    mAP_log_path = os.path.join(output_path, "mAP.txt")
+    infer_log_path = os.path.join(output_path, "infer.log")
+    bash_output = os.path.join(output_path, "eval_mAP.sh")
+    with open(bash_output, "w") as f:
+        for test_dataset in test_datasets:
+            test_dataset = os.path.abspath(os.path.join("_datasets/_test_sets", test_dataset))
+            det_folder = test_dataset+"_det"
+            if os.path.isdir(det_folder):
+                shutil.rmtree(det_folder)
+            infer_cmd = "python -m efficientdet-pytorch.infer %s 60 %s > %s" % (test_dataset, model_path, infer_log_path)
+            eval_cmd = "python Object-Detection-Metrics/pascalvoc.py -gt %s -det %s -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np" % (test_dataset, det_folder)
+            f.write("echo " + model_path + " | tee -a " + mAP_log_path + "\n")
+            f.write(infer_cmd + "\n")
+            f.write(eval_cmd + " | tee -a " + mAP_log_path + "\n")
+    subprocess.Popen(["/bin/bash", bash_output], cwd = "..")
+
 class Fitter:
     def __init__(self, model, device, config, output_folder, logger):
         self.config = config
@@ -312,9 +337,14 @@ class Fitter:
             if summary_loss.avg < self.best_summary_loss:
                 self.best_summary_loss = summary_loss.avg
             self.model.eval()
-            self.save(f'{self.base_dir}/best-checkpoint-{str(self.epoch).zfill(3)}epoch.bin')
+            model_path = f'{self.base_dir}/best-checkpoint-{str(self.epoch).zfill(3)}epoch.bin'
+            self.save(model_path)
             #for path in sorted(glob(f'{self.base_dir}/best-checkpoint-*epoch.bin'))[:-3]:
             #    os.remove(path)
+
+            if validation_loader.eval_mAP_on_test_sets:
+                # Launch mAP evaluation on the secondary video card
+                eval_mAP(validation_loader.test_sets, model_path)
 
             if self.config.validation_scheduler:
                 self.scheduler.step(metrics=summary_loss.avg)
@@ -337,7 +367,7 @@ class Fitter:
             with torch.no_grad():
                 images = torch.stack(images)
                 batch_size = images.shape[0]
-                images = images.to(self.device).float()
+                images = images.to(self.device).float() / 255.0
                 boxes = [target['boxes'].to(self.device).float() for target in targets]
                 labels = [target['labels'].to(self.device).float() for target in targets]
 
@@ -369,7 +399,7 @@ class Fitter:
                     )
             
             images = torch.stack(images)
-            images = images.to(self.device).float()
+            images = images.to(self.device).float() / 255.0
             batch_size = images.shape[0]
             boxes = [target['boxes'].to(self.device).float() for target in targets]
             labels = [target['labels'].to(self.device).float() for target in targets]
@@ -418,14 +448,16 @@ class TrainGlobalConfig:
     num_workers = 4
     batch_size = 4
     n_epochs = 256
-    lr = 0.01
+    #lr = 0.01
     #lr = 0.001
-    #lr = 0.0001
+    lr = 0.0001
+    #lr = 0.00001
     #lr = 0.00003
-
     # -------------------
     verbose = True
     verbose_step = 1
+    eval_mAP_on_test_sets = True
+    test_sets = ["private_dataset_no_crop_aabb", "web-collection-001-002_dataset_no_crop_aabb"]
     # -------------------
 
     # --------------------
@@ -481,6 +513,8 @@ def run_training(net, output_folder, logger):
         pin_memory=False,
         collate_fn=collate_fn,
     )
+    val_loader.eval_mAP_on_test_sets = TrainGlobalConfig.eval_mAP_on_test_sets
+    val_loader.test_sets = TrainGlobalConfig.test_sets
 
     fitter = Fitter(model=net, device=device, config=TrainGlobalConfig, output_folder=output_folder, logger=logger)
     fitter.fit(train_loader, val_loader)
@@ -500,14 +534,16 @@ def build_dataset(names, filters, output_name, logger):
     logger.log("Build dataset:")
     for name in names:
         path = os.path.join(dataset_path_base, name)
-        logger.log("\t" + name)
+        count = 0
         for item in os.listdir(path):
             ext = item[item.rfind("."):]
             if ext not in filters:
                 continue
+            count += 1
             back_path = [".."]*(output_name.replace("\\", "/").count("/")+2)
             file_path = os.path.join(*back_path, dataset_path_base, name, item).replace("\\", "/")
             all_img.append(file_path)
+        logger.log("%7d\t%s" % (count, name))
     random.shuffle(all_img)
 
     total = len(all_img)
@@ -538,8 +574,8 @@ def build_dataset(names, filters, output_name, logger):
         for line in test_set:
             f.write(line)
 
-    logger.log("Training set: %7d" % len(train_set))
-    logger.log("Test set:     %7d" % len(test_set))
+    logger.log("Training set: %9d" % len(train_set))
+    logger.log("Test set:     %9d" % len(test_set))
 
     return output_path
 
@@ -549,25 +585,27 @@ if __name__ == '__main__':
 
     img_scale = 768
     box_scale = 768
-    num_classes = 3
-
+    num_classes = 1
 
     datasets = [
-        #"0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb",
-        #"0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb",
-        #"0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus",
-        #"0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus",
-        #"0013_dataset_tongji_011_768_768_obb",
-        #"0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb",
-        #"0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb",
-        #"0016_dataset_ysq1_768_768_obb",
-        #"0017_dataset_ysq1_1440_768_obb",
-        "a004_dataset_changan001_ped_bike_motor_384_768_3classes"
+        "0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb",
+        "0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb",
+        "0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus",
+        "0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus",
+        "0013_dataset_tongji_011_768_768_obb",
+        "0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb",
+        "0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb",
+        "0016_dataset_ysq1_768_768_obb",
+        "0017_dataset_ysq1_1440_768_obb",
+        #"a004_dataset_changan001_ped_bike_motor_384_768_3classes"
         "0018_syq4_dataset_768_768_obb_bus",
         "0019_gm7_dataset_768_768_obb_bus",
         ]
+    #datasets = ["0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus"]
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
+    if len(sys.argv) > 1:
+        output_name = sys.argv[1]
 
     output_path = os.path.join(model_path_base, output_name)
     if not os.path.isdir(output_path):
@@ -579,6 +617,9 @@ if __name__ == '__main__':
     dataset_path = build_dataset(datasets, {".jpg", ".jpeg", ".png", ".bmp"}, output_name, logger)
     train_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_train_transforms(), transform2=get_train_transforms2(img_scale), test=False)
     validation_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_valid_transforms(), transform2=get_train_transforms2(img_scale), test=True)
+    logger.log("Batch Size:   %9d" % TrainGlobalConfig.batch_size)
+    logger.log("Learning Rate: %f" % TrainGlobalConfig.lr)
+    logger.log(TrainGlobalConfig.SchedulerClass)
 
     if 1:
         for i, (img, target, img_id) in enumerate(train_dataset):
@@ -600,5 +641,6 @@ if __name__ == '__main__':
     device = torch.device('cuda:0')
     net.to(device)
     copyfile(sys.argv[0], os.path.join(output_path, os.path.split(sys.argv[0])[-1]))
+    copyfile("infer.py", os.path.join(output_path, "infer.py"))
     run_training(net, output_path, logger)
 
