@@ -32,13 +32,16 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config = get_efficientdet_config(model_name)
     net = EfficientDet(config, pretrained_backbone=False)
 
+    device = torch.device('cuda:1')
+    net = net.to(device)
+
     config.num_classes = num_classes
     config.image_size = image_scale
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
     if not os.path.isabs(checkpoint_path):
         checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location='cuda:1')
     net.load_state_dict(checkpoint['model_state_dict'])
 
     del checkpoint
@@ -46,6 +49,8 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
 
     net = DetBenchPredict(net, config)
     net.eval()
+    return net.cuda()
+
     return net.cuda()
 
 def make_predictions(images, net, score_threshold=0.22):
@@ -285,11 +290,11 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             end_point = (int(bbox[2]), int(bbox[3])) 
             if not want_aabb:
                 del obj["box"]
-            c = (1, 0, 0)           #    red: (0.7, 1.0)
-            if score < 0.5:         #  green: (0.5, 0.7)
-                c = (1, 1, 0)       # yellow: (0.0, 0.5)
+            c = (255, 0, 0)             #    red: (0.7, 1.0)
+            if score < 0.5:             #  green: (0.5, 0.7)
+                c = (255, 255, 0)       # yellow: (0.0, 0.5)
             if score < 0.7:
-                c = (0, 1, 0)
+                c = (0, 255, 0)
             img2 = cv2.rectangle(img2, start_point, end_point, c, 2)
             #class_name_maps = ["bg", "car"]
             #class_name_maps = ["bg", "ped", "bike", "motor"]
@@ -298,7 +303,7 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
 
         img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
         if config.save_img:
-            cv2.imwrite(config.img_name, img2 * 255)
+            cv2.imwrite(config.img_name, img2)
         height, width, _ = img2.shape
         #print(img2.shape)
         if width > 1920:
@@ -321,7 +326,7 @@ def dist2(p1, p2):
     return (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2
 
 def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np_img = None, delay = 1):
-    import track
+    from .track import track
     angles = [float(v) for v in range(0, 90, angle_step)]
     #angles = [0.0]
     results = []
@@ -330,11 +335,11 @@ def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np
         result = predict(net, config, angle, img_path=img_path, img_bytes=img_bytes, np_img=np_img, delay=delay)
         print("[%d]: Found %3d vehicles in %.3fs" % (angle, len(result), time.time() - start))
         results.append((angle, result))
-    objs = track.track(load_frame(results), single_frame_obb = True)
+    objs = track(load_frame(results), single_frame_obb = True)
     print(len(objs))
     return objs
 
-def find_the_right_crop_size(net, config, common_vehicle_length, img_path = None, img_bytes = None, np_img = None, delay = 1):
+def find_the_right_crop_size(net, config, common_vehicle_width, img_path = None, img_bytes = None, np_img = None, delay = 1):
     from sklearn.cluster import KMeans
 
     angle_step = 15
@@ -355,24 +360,18 @@ def find_the_right_crop_size(net, config, common_vehicle_length, img_path = None
         print(img_path)
         result = predict_obb(net, config, angle_step, img_path=img_path, img_bytes=img_bytes, np_img=np_img, delay=delay)
         for obj in result:
-            if len(obj["boxes"]) < len(angles)*0.6:
+            if obj["box_count"] < len(angles)*0.6:
                 continue
-            area2_min = 1e20
-            for box in obj["boxes"]:
-                if box["score"] < 0.7:
-                    continue
-                polyon = box["polygon"]
-                width2 = dist2(polyon[0], polyon[1])
-                length2 = dist2(polyon[1], polyon[2])
-                area2 = width2 * length2
-                if area2 < area2_min:
-                    area2_min = area2
-                    if length2 < width2:
-                        length, width = math.sqrt(width2) , math.sqrt(length2)  # swap
-                    else:
-                        length, width = math.sqrt(length2) , math.sqrt(width2)
-            if area2_min != 1e20:
-                boxes.append([length, width])
+            if obj["score"] < 0.7:
+                continue
+            polyon = obj["poly"]
+            width2 = dist2(polyon[0], polyon[1])
+            length2 = dist2(polyon[1], polyon[2])
+            if length2 < width2:
+                length, width = math.sqrt(width2) , math.sqrt(length2)  # swap
+            else:
+                width, length = math.sqrt(width2) , math.sqrt(length2)
+            boxes.append([length, width])
     if len(boxes) < 3:
         return 768
     kmeans = KMeans(n_clusters=3, random_state=0).fit(boxes)
@@ -380,9 +379,9 @@ def find_the_right_crop_size(net, config, common_vehicle_length, img_path = None
     print(np.bincount(kmeans.labels_))
     common_box = kmeans.cluster_centers_[np.argmax(np.bincount(kmeans.labels_))]
     print(common_box)
-    return int(768.0 * common_box[0] / common_vehicle_length)
+    return int(768.0 * common_box[0] / common_vehicle_width)
 
-def run(path, angles, common_vehicle_length=None, model_path=None):
+def run(path, angles, common_vehicle_width=None, model_path=None):
     net, config = init_net(model_path)
 
     if len(angles) == 0:
@@ -410,16 +409,16 @@ def run(path, angles, common_vehicle_length=None, model_path=None):
 
             start = time.time()
             config.img_name = output_path[0:output_path.rfind(".")]+".jpg"
-            if common_vehicle_length is not None:
+            if common_vehicle_width is not None:
                 attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
                 config.save_img = False
                 print(attrs_json_path)
                 if os.path.exists(attrs_json_path):
                     with open(attrs_json_path) as f:
                         attrs = json.load(f)
-                    config.crop_size = int(768.0 * attrs["MostCommonVehicleLengthInPixels"] / common_vehicle_length)
+                    config.crop_size = int(768.0 * attrs["MostCommonVehicleLengthInPixels"] / common_vehicle_width)
                 else:
-                    config.crop_size = find_the_right_crop_size(net, config, common_vehicle_length, img_path=img_path, delay=1)
+                    config.crop_size = find_the_right_crop_size(net, config, common_vehicle_width, img_path=img_path, delay=1)
                 config.overlap_size = int(config.crop_size * 200.0 / 768.0) // 2 * 2
                 print("crop: %d/%d" % (config.overlap_size, config.crop_size))
             if config.want_obb_result:
@@ -428,42 +427,25 @@ def run(path, angles, common_vehicle_length=None, model_path=None):
                 markers = []
                 id = -1
                 for obj in results:
-                    if len(obj["boxes"]) < 90 // angle_step * 0.5:
+                    if obj["box_count"] < 90 // angle_step * 0.5:
                         continue
                     id += 1
-                    area2_min = 999999999999.0
-                    min_box = None
-                    for box in obj["boxes"]:
-                        polyon = box["polygon"]
-                        area2 = dist2(polyon[0], polyon[1]) * dist2(polyon[1], polyon[2])
-                        if area2 < area2_min:
-                            area2_min = area2
-                            min_box = box
-
-                    width = math.sqrt(dist2(min_box["polygon"][0], min_box["polygon"][1]))
-                    length = math.sqrt(dist2(min_box["polygon"][1], min_box["polygon"][2]))
-                    angle = float(min_box["angle"])
-                    if width > length:
-                        width, length = length, width
-                        angle += 90.0
-                    x = (min_box["polygon"][0][0] + min_box["polygon"][2][0]) * 0.5
-                    y = (min_box["polygon"][0][1] + min_box["polygon"][2][1]) * 0.5
                     m = {
                         "frame_id": 0,
-                        "heading_angle": angle,
+                        "heading_angle": obj["angle"],
                         "id": id,
-                        "width": width,
-                        "length": length,
-                        "manually_keyed": True,
-                        "score": min_box["score"],
-                        "x": x,
-                        "y": y
+                        "width": obj["width"],
+                        "length": obj["length"],
+                        "manually_keyed": False,
+                        "score": obj["score"],
+                        "x": obj["center"][0],
+                        "y": obj["center"][1]
                     }
                     markers.append([m])
                 marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
                 if marker_path is not None:
                     with open(marker_path, "w") as f:
-                        f.write(pprint.pformat(markers, width=300, indent=1).replace("'", "\"").replace("True", "true"))
+                        f.write(pprint.pformat(markers, width=300, indent=1).replace("'", "\"").replace("True", "true").replace("False", "false"))
 
             else:
                 config.save_img = True
@@ -533,7 +515,7 @@ def init_net(model_path = None):
         img_name = "save_16.png"
         img_suffix = ""
         save_result = True
-        want_obb_result = False
+        want_obb_result = True
         result_format = "json"
         #result_format = "txt"
 
@@ -607,7 +589,7 @@ def main():
     if len(sys.argv) < 2 or len(sys.argv) > 4:
         print("Usage: python infer.py test.jpg [60.0] []")
     else:
-        run(sys.argv[1], [], common_vehicle_length=(float(sys.argv[2]) if len(sys.argv) > 2 else None), model_path=(sys.argv[3] if len(sys.argv) > 3 else None))
+        run(sys.argv[1], [], common_vehicle_width=(float(sys.argv[2]) if len(sys.argv) > 2 else None), model_path=(sys.argv[3] if len(sys.argv) > 3 else None))
 
 if __name__ == '__main__':
     main()

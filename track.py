@@ -181,6 +181,8 @@ def read_json_objs(base_path):
 
 def compute_attrs(obj):
     boxes = obj["boxes"]
+    if len(boxes) == 0:
+        return {}
     if len(boxes) == 1:
         poly = boxes[0]["polygon"]
         obj["poly"] = poly
@@ -191,8 +193,9 @@ def compute_attrs(obj):
         obj["length"] = 9999.0
         obj["width"] = 9999.0
         obj["score"] = boxes[0]["score"]
+        obj["box_count"] = 1
     else:
-        min_area2 = 99999999999.0
+        min_area2 = 1e30
         min_area_angle = None
         min_area_length2 = None
         min_area_width2 = None
@@ -201,13 +204,13 @@ def compute_attrs(obj):
         aabb = None
         aabb_score = None
         for box in boxes:
-            angle = box["angle"]
             poly = box["polygon"]
-            if angle == 0.0:
+            if box["angle"] == 0.0:
                 aabb = poly
                 aabb_score = box["score"]
-            length2 = dist2(poly[0], poly[1])
-            width2 = dist2(poly[1], poly[2])
+            angle = math.degrees(math.atan2(poly[2][1]-poly[1][1], poly[2][0]-poly[1][0]))
+            width2 = dist2(poly[0], poly[1])
+            length2 = dist2(poly[1], poly[2])
             area2 = length2 * width2
             if area2 < min_area2:
                 min_area2 = area2
@@ -229,6 +232,7 @@ def compute_attrs(obj):
         obj["angle"] = min_area_angle
         obj["length"] = round(math.sqrt(min_area_length2), 4)
         obj["width"] = round(math.sqrt(min_area_width2), 4)
+        obj["box_count"] = len(boxes)
     min_x = min(poly[0][0], poly[1][0], poly[2][0], poly[3][0])
     min_y = min(poly[0][1], poly[1][1], poly[2][1], poly[3][1])
     max_x = max(poly[0][0], poly[1][0], poly[2][0], poly[3][0])

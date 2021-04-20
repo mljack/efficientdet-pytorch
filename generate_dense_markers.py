@@ -13,11 +13,6 @@ def dist2(p1, p2):
 def dot(p1, p2):
     return p1[0]*p2[0] + p1[1]*p2[1]
 
-def deg2rad(v):
-    return v / 180.0 * 3.14159265
-
-def rad2deg(v):
-    return v / 3.14159265 * 180.0
 
 class State:
     def __init__(self, frame_id, time, state):
@@ -30,7 +25,7 @@ class State:
             polyon = state["poly"]
             self.width = math.sqrt(dist2(polyon[0], polyon[1]))
             self.length = math.sqrt(dist2(polyon[1], polyon[2]))
-            self.heading_angle = rad2deg(math.atan2(polyon[2][1]-polyon[1][1], polyon[2][0]-polyon[1][0]))
+            self.heading_angle = math.degrees(math.atan2(polyon[2][1]-polyon[1][1], polyon[2][0]-polyon[1][0]))
             if self.length < self.width:
                 self.length, self.width = self.width , self.length  # swap
                 self.heading_angle += 90.0
@@ -97,7 +92,7 @@ def generate(objs_base_path, video_path, csv_path):
         else:
             keys = list(markers[idx].keys())
             for k, marker in enumerate(markers[idx].values()):
-                rad = deg2rad(marker["heading_angle"])
+                rad = math.radians(marker["heading_angle"])
                 v = (math.cos(rad), math.sin(rad))
                 vv = [0.0, 0.0]
                 d2 = 0.0
