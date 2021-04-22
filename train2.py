@@ -2,6 +2,7 @@ import os
 import sys
 from shutil import copyfile
 from datetime import datetime
+from collections import OrderedDict
 import time
 import math
 import random
@@ -98,6 +99,13 @@ def get_train_transforms2(img_scale):
             #    A.HueSaturationValue(hue_shift_limit=0.5, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.9),
             #    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.9),
             #],p=0.9),
+            #A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), p=0.3),
+            #A.JpegCompression(quality_lower=15, quality_upper=75, p=0.3),
+            #A.GaussNoise(var_limit=(10.0, 50.0), mean=0, p=0.3),
+            #A.RandomGamma(gamma_limit=(80, 140), p=0.3),
+            A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=0,
+                interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), p=0.5),
+            #A.IAAPerspective(scale=(0.05, 0.05), keep_size=True, p=0.5),
             A.OneOf([
                 A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.05, p=0.95),
                 A.ToGray(p=0.05),
@@ -447,7 +455,8 @@ class Fitter:
 class TrainGlobalConfig:
     num_workers = 4
     batch_size = 4
-    n_epochs = 256
+    n_epochs = 40
+    samples_per_virtual_epoch = 10000
     #lr = 0.01
     #lr = 0.001
     lr = 0.0001
@@ -494,8 +503,34 @@ class TrainGlobalConfig:
 def collate_fn(batch):
     return tuple(zip(*batch))
 
+class VirtualDataLoader:
+
+    def __init__(self, data_loader, steps_per_epoch: int = 1000):
+        self.data_loader = data_loader
+        self.iterator = iter(self.data_loader)
+        self.steps_per_epoch = steps_per_epoch
+        self.current_step = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current_step < self.steps_per_epoch:
+            self.current_step += 1
+            try:
+                return next(self.iterator)
+            except StopIteration:
+                self.iterator = iter(self.data_loader)
+                return next(self.iterator)
+        else:
+            self.current_step = 0
+            raise StopIteration
+
+    def __len__(self):
+        return self.steps_per_epoch
+
 def run_training(net, output_folder, logger):
-    train_loader = torch.utils.data.DataLoader(
+    train_loader = torch.utils.data.DataLader(
         train_dataset,
         batch_size=TrainGlobalConfig.batch_size,
         sampler=RandomSampler(train_dataset),
@@ -517,7 +552,8 @@ def run_training(net, output_folder, logger):
     val_loader.test_sets = TrainGlobalConfig.test_sets
 
     fitter = Fitter(model=net, device=device, config=TrainGlobalConfig, output_folder=output_folder, logger=logger)
-    fitter.fit(train_loader, val_loader)
+    virtual_train_loader = VirtualDataLoader(train_loader, TrainGlobalConfig.samples_per_virtual_epoch // TrainGlobalConfig.batch_size)
+    fitter.fit(virtual_train_loader, val_loader)
 
 def build_net(type, img_scale, num_classes):
     config = effdet.get_efficientdet_config(type)
@@ -532,9 +568,10 @@ def build_net(type, img_scale, num_classes):
 def build_dataset(names, filters, output_name, logger):
     all_img = []
     logger.log("Build dataset:")
-    for name in names:
+    for name, ratio in names.items():
         path = os.path.join(dataset_path_base, name)
         count = 0
+        items = []
         for item in os.listdir(path):
             ext = item[item.rfind("."):]
             if ext not in filters:
@@ -542,12 +579,15 @@ def build_dataset(names, filters, output_name, logger):
             count += 1
             back_path = [".."]*(output_name.replace("\\", "/").count("/")+2)
             file_path = os.path.join(*back_path, dataset_path_base, name, item).replace("\\", "/")
-            all_img.append(file_path)
-        logger.log("%7d\t%s" % (count, name))
+            items.append(file_path)
+        random.shuffle(items)
+        items = items[:int(ratio*len(items))]
+        all_img += items
+        logger.log("%7d/%7d\t%s" % (len(items), count, name))
     random.shuffle(all_img)
 
     total = len(all_img)
-    train_n = int(total * 0.8)
+    train_n = int(total * 0.95)
     train_set = []
     test_set = []
 
@@ -580,28 +620,31 @@ def build_dataset(names, filters, output_name, logger):
     return output_path
 
 if __name__ == '__main__':
-    SEED = 42
+    if len(sys.argv) > 2:
+        SEED = int(sys.argv[2])
+    else:
+        SEED = 42
     seed_everything(SEED)
 
     img_scale = 768
     box_scale = 768
     num_classes = 1
 
-    datasets = [
-        "0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb",
-        "0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb",
-        "0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus",
-        "0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus",
-        "0013_dataset_tongji_011_768_768_obb",
-        "0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb",
-        "0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb",
-        "0016_dataset_ysq1_768_768_obb",
-        "0017_dataset_ysq1_1440_768_obb",
-        #"a004_dataset_changan001_ped_bike_motor_384_768_3classes"
-        "0018_syq4_dataset_768_768_obb_bus",
-        "0019_gm7_dataset_768_768_obb_bus",
-        ]
-    #datasets = ["0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus"]
+    datasets = OrderedDict({
+        "0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb":     1.0,
+        "0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb":    1.0,
+        "0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus": 1.0,
+        "0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus":1.0,
+        "0013_dataset_tongji_011_768_768_obb":                              1.0,
+        "0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb":     1.0,
+        "0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb":     1.0,
+        "0016_dataset_ysq1_768_768_obb":                                    1.0,
+        "0017_dataset_ysq1_1440_768_obb":                                   1.0,
+        #"a004_dataset_changan001_ped_bike_motor_384_768_3classes":          1.0
+        "0018_syq4_dataset_768_768_obb_bus":                                1.0,
+        "0019_gm7_dataset_768_768_obb_bus":                                 1.0,
+        "0020_web-collection-003_888_768_768_obb":                          1.0,
+    })
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
     if len(sys.argv) > 1:
@@ -619,16 +662,18 @@ if __name__ == '__main__':
     validation_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_valid_transforms(), transform2=get_train_transforms2(img_scale), test=True)
     logger.log("Batch Size:   %9d" % TrainGlobalConfig.batch_size)
     logger.log("Learning Rate: %f" % TrainGlobalConfig.lr)
+    logger.log("Num of Epoch:  %d" % TrainGlobalConfig.n_epochs)
     logger.log(TrainGlobalConfig.SchedulerClass)
 
-    if 1:
+    if 0:
         for i, (img, target, img_id) in enumerate(train_dataset):
             img = img.permute(1,2,0).cpu().numpy()
             boxes = target['boxes'].cpu().numpy().astype(np.int32)
             class_ids = target['labels'].cpu().numpy().astype(np.int32)
             for i, box in enumerate(boxes):
-                cv2.rectangle(img, (box[1], box[0]), (box[3],  box[2]), (0, 1, 0), 1)
-                img = cv2.putText(img, class_name_maps[class_ids[i]], (box[1], box[0]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) , 2, cv2.LINE_AA) 
+                cv2.rectangle(img, (box[1], box[0]), (box[3],  box[2]), (255, 0, 0), 1)
+                img = cv2.putText(img, class_name_maps[class_ids[i]], (box[1], box[0]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) , 2, cv2.LINE_AA)
+            print(img_id)
             cv2.imshow("image", cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             k = cv2.waitKey()
             if k == 27:
