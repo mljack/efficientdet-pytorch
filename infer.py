@@ -290,11 +290,13 @@ def predict(net, config, angle = 0.0, img_path = None, img_bytes = None, np_img 
             end_point = (int(bbox[2]), int(bbox[3])) 
             if not want_aabb:
                 del obj["box"]
-            c = (255, 0, 0)             #    red: (0.7, 1.0)
-            if score < 0.5:             #  green: (0.5, 0.7)
-                c = (255, 255, 0)       # yellow: (0.0, 0.5)
-            if score < 0.7:
+            # confidence: 1.0 red 0.7 green 0.5 yellow 0.0
+            if score < 0.5:
+                c = (255, 255, 0)
+            elif score < 0.7:
                 c = (0, 255, 0)
+            else:
+                c = (255, 0, 0)
             img2 = cv2.rectangle(img2, start_point, end_point, c, 2)
             #class_name_maps = ["bg", "car"]
             #class_name_maps = ["bg", "ped", "bike", "motor"]
@@ -335,7 +337,8 @@ def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np
         result = predict(net, config, angle, img_path=img_path, img_bytes=img_bytes, np_img=np_img, delay=delay)
         print("[%d]: Found %3d vehicles in %.3fs" % (angle, len(result), time.time() - start))
         results.append((angle, result))
-    objs = track(load_frame(results), single_frame_obb = True)
+    img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+    objs = track(load_frame(results), img, single_frame_obb = True)
     print(len(objs))
     return objs
 
@@ -379,7 +382,7 @@ def find_the_right_crop_size(net, config, common_vehicle_width, img_path = None,
     print(np.bincount(kmeans.labels_))
     common_box = kmeans.cluster_centers_[np.argmax(np.bincount(kmeans.labels_))]
     print(common_box)
-    return int(768.0 * common_box[0] / common_vehicle_width)
+    return int(768.0 * common_box[1] / common_vehicle_width)
 
 def run(path, angles, common_vehicle_width=None, model_path=None):
     net, config = init_net(model_path)
@@ -416,7 +419,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
                 if os.path.exists(attrs_json_path):
                     with open(attrs_json_path) as f:
                         attrs = json.load(f)
-                    config.crop_size = int(768.0 * attrs["MostCommonVehicleLengthInPixels"] / common_vehicle_width)
+                    config.crop_size = int(768.0 * attrs["MostCommonVehicleWidthInPixels"] / common_vehicle_width)
                 else:
                     config.crop_size = find_the_right_crop_size(net, config, common_vehicle_width, img_path=img_path, delay=1)
                 config.overlap_size = int(config.crop_size * 200.0 / 768.0) // 2 * 2
@@ -515,7 +518,7 @@ def init_net(model_path = None):
         img_name = "save_16.png"
         img_suffix = ""
         save_result = True
-        want_obb_result = True
+        want_obb_result = False
         result_format = "json"
         #result_format = "txt"
 
@@ -587,7 +590,7 @@ def main():
 
     print(sys.argv)
     if len(sys.argv) < 2 or len(sys.argv) > 4:
-        print("Usage: python infer.py test.jpg [60.0] []")
+        print("Usage: python infer.py test.jpg [30.0] [model_path.bin]")
     else:
         run(sys.argv[1], [], common_vehicle_width=(float(sys.argv[2]) if len(sys.argv) > 2 else None), model_path=(sys.argv[3] if len(sys.argv) > 3 else None))
 

@@ -179,7 +179,56 @@ def read_json_objs(base_path):
             yield item, json.load(f)
     yield "99999_000.json", None
 
-def compute_attrs(obj):
+def rotation_mat(image, angle):
+    (h, w) = image.shape[:2]
+    (cX, cY) = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
+    cos = np.abs(M[0, 0])
+    sin = np.abs(M[0, 1])
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+    M[0, 2] += (nW / 2) - cX
+    M[1, 2] += (nH / 2) - cY
+    return M, nW, nH
+
+def poly2aabb(poly):
+    x0 = np.min(poly[:,0])
+    x1 = np.max(poly[:,0])
+    y0 = np.min(poly[:,1])
+    y1 = np.max(poly[:,1])
+    return np.array([(x0,y0),(x1,y0),(x1,y1),[x0,y1]])
+
+def poly2aabb2(poly):
+    x0 = np.min(poly[:,0])
+    x1 = np.max(poly[:,0])
+    y0 = np.min(poly[:,1])
+    y1 = np.max(poly[:,1])
+    return np.array([x0,y0,x1,y1])
+
+def compute_iou(image, ref_poly, ref_angle, poly, angle):
+    M, nW, nH = rotation_mat(image, angle)
+    poly2 = cv2.transform(poly, M)[0,:,:]
+    ref_poly2 = cv2.transform(ref_poly, M)[0,:,:]
+    iou = IoU(poly2aabb2(ref_poly2), poly2aabb2(poly2))
+    #print("IoU: ", iou)
+
+    if 0:
+        image = image.copy()
+        image = cv2.warpAffine(image, M, (nW, nH))
+        image = cv2.drawContours(image, np.int32([poly2]), 0, (0, 255, 255), 1)
+        image = cv2.drawContours(image, [np.int32(ref_poly2)], 0, (255, 0, 255), 1)
+        image = cv2.drawContours(image, [np.int32(poly2aabb(ref_poly2))], 0, (255, 0, 0), 1)
+        #cv2.imwrite("rotated.png", image*255)
+        cv2.namedWindow("img", cv2.WINDOW_NORMAL)
+        #cv2.setWindowProperty("input", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.imshow("img", image)
+        k = cv2.waitKey()
+        if k == 27:
+            exit(0)
+
+    return iou
+
+def compute_attrs(obj, img):
     boxes = obj["boxes"]
     if len(boxes) == 0:
         return {}
@@ -201,9 +250,10 @@ def compute_attrs(obj):
         min_area_width2 = None
         min_area_poly = None
         min_area_score = None
+        min_area_idx = -1
         aabb = None
         aabb_score = None
-        for box in boxes:
+        for idx, box in enumerate(boxes):
             poly = box["polygon"]
             if box["angle"] == 0.0:
                 aabb = poly
@@ -213,6 +263,7 @@ def compute_attrs(obj):
             length2 = dist2(poly[1], poly[2])
             area2 = length2 * width2
             if area2 < min_area2:
+                min_area_idx = idx
                 min_area2 = area2
                 min_area_angle = angle
                 min_area_length2 = length2
@@ -233,15 +284,31 @@ def compute_attrs(obj):
         obj["length"] = round(math.sqrt(min_area_length2), 4)
         obj["width"] = round(math.sqrt(min_area_width2), 4)
         obj["box_count"] = len(boxes)
+
+        min_area_poly = np.array([min_area_poly])
+        certainty_acc = 0.0
+        for idx, box in enumerate(boxes):
+            if idx == min_area_idx:
+                continue
+            #print("\t", box)
+            iou = compute_iou(img, min_area_poly, min_area_angle, np.array([box["polygon"]]), box['angle'])
+            #certainty_acc += iou * box["score"]
+            certainty_acc += iou
+        uncertainty = 1 - certainty_acc / len(range(0,90,5))
+        print("[%3d][%3d boxes]: %.4f %.4f" % (obj['obj_id'], len(box), uncertainty, 1-obj["score"]))
+        obj["score"] = 1 - uncertainty
+
     min_x = min(poly[0][0], poly[1][0], poly[2][0], poly[3][0])
     min_y = min(poly[0][1], poly[1][1], poly[2][1], poly[3][1])
     max_x = max(poly[0][0], poly[1][0], poly[2][0], poly[3][0])
     max_y = max(poly[0][1], poly[1][1], poly[2][1], poly[3][1])
     obj["aabb"] = [[min_x, min_y], [max_x, max_y]]
     obj["label"] = 1.0
+
     del obj["boxes"]
 
-def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
+
+def track(json_objs, img2, output_path=None, video_path=None, single_frame_obb=False):
     track_count = 0
 
     if video_path is not None:
@@ -333,7 +400,7 @@ def track(json_objs, output_path=None, video_path=None, single_frame_obb=False):
                     obj_json["boxes"] = [{"label":angle_obj.label, "angle":angle, "score":angle_obj.score,
                         "polygon":[[round(p[0],4), round(p[1],4)]for p in angle_obj.box]}
                         for angle, angle_obj in obj.frames[json_frame_id_old].items()]   # boxes in all kinds of angles
-                    compute_attrs(obj_json)
+                    compute_attrs(obj_json, img2)
                     frame_json.append(obj_json)
                 if output_path is not None:
                     json_path = os.path.join(output_path, "%05d.tracked.json" % json_frame_id_old)
