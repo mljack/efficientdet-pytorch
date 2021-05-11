@@ -337,7 +337,7 @@ def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np
         result = predict(net, config, angle, img_path=img_path, img_bytes=img_bytes, np_img=np_img, delay=delay)
         print("[%d]: Found %3d vehicles in %.3fs" % (angle, len(result), time.time() - start))
         results.append((angle, result))
-    img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+    img = np_img if img_path is None else cv2.imread(img_path, cv2.IMREAD_COLOR)
     objs = track(load_frame(results), img, single_frame_obb = True)
     print(len(objs))
     return objs
@@ -435,12 +435,14 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
                     id += 1
                     m = {
                         "frame_id": 0,
-                        "heading_angle": obj["angle"],
+                        "heading_angle": round(obj["angle"], 1),
                         "id": id,
                         "width": obj["width"],
                         "length": obj["length"],
                         "manually_keyed": False,
-                        "score": obj["score"],
+                        "score": round(obj["score"], 6),
+                        "certainty": round(obj["certainty"], 6),
+                        "certainty2": round(obj["certainty2"], 6),
                         "x": obj["center"][0],
                         "y": obj["center"][1]
                     }

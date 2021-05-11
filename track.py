@@ -242,6 +242,8 @@ def compute_attrs(obj, img):
         obj["length"] = 9999.0
         obj["width"] = 9999.0
         obj["score"] = boxes[0]["score"]
+        obj["certainty"] = 0.0
+        obj["certainty2"] = 0.0
         obj["box_count"] = 1
     else:
         min_area2 = 1e30
@@ -287,16 +289,18 @@ def compute_attrs(obj, img):
 
         min_area_poly = np.array([min_area_poly])
         certainty_acc = 0.0
+        certainty_acc2 = 0.0
         for idx, box in enumerate(boxes):
             if idx == min_area_idx:
                 continue
-            #print("\t", box)
             iou = compute_iou(img, min_area_poly, min_area_angle, np.array([box["polygon"]]), box['angle'])
-            #certainty_acc += iou * box["score"]
             certainty_acc += iou
-        uncertainty = 1 - certainty_acc / len(range(0,90,5))
-        print("[%3d][%3d boxes]: %.4f %.4f" % (obj['obj_id'], len(box), uncertainty, 1-obj["score"]))
-        obj["score"] = 1 - uncertainty
+            certainty_acc2 += iou * box["score"]
+        certainty = certainty_acc / len(range(0,90,5))
+        certainty2 = certainty_acc2 / len(range(0,90,5))
+        obj["certainty"] = certainty
+        obj["certainty2"] = certainty2
+        #print("[%3d][%3d boxes]: %.4f %.4f" % (obj['obj_id'], len(box), certainty, certainty2))
 
     min_x = min(poly[0][0], poly[1][0], poly[2][0], poly[3][0])
     min_y = min(poly[0][1], poly[1][1], poly[2][1], poly[3][1])
