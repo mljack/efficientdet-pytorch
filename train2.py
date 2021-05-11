@@ -282,8 +282,8 @@ def eval_mAP(test_datasets, model_path):
             det_folder = test_dataset+"_det"
             if os.path.isdir(det_folder):
                 shutil.rmtree(det_folder)
-            infer_cmd = "python -m efficientdet-pytorch.infer %s 60 %s > %s" % (test_dataset, model_path, infer_log_path)
-            eval_cmd = "python Object-Detection-Metrics/pascalvoc.py -gt %s -det %s -gtformat xyrb -detformat xyrb --savepath _results -t 0.75 -np" % (test_dataset, det_folder)
+            infer_cmd = "python -m efficientdet_pytorch.infer %s 25 %s > %s" % (test_dataset, model_path, infer_log_path)
+            eval_cmd = "python Object-Detection-Metrics/pascalvoc.py -gt %s -det %s" % (test_dataset, det_folder)
             f.write("echo " + model_path + " | tee -a " + mAP_log_path + "\n")
             f.write(infer_cmd + "\n")
             f.write(eval_cmd + " | tee -a " + mAP_log_path + "\n")
@@ -405,8 +405,16 @@ class Fitter:
                         f'time: {((time.time() - t)/60.0):.1f} mins ' + \
                         f'remaining: {((time.time() - t)/(step+1)*(len(train_loader)-step-1)/60.0):.1f} mins            ', end='\r'
                     )
-            
-            images = torch.stack(images)
+
+            try:
+                images = torch.stack(images)
+            except TypeError:
+                print("Found non-tensor inputs!")
+                print(images)
+                print([image.shape for image in images])
+                images = [torch.tensor(image) for image in images]
+                images = torch.stack(images)
+
             images = images.to(self.device).float() / 255.0
             batch_size = images.shape[0]
             boxes = [target['boxes'].to(self.device).float() for target in targets]
@@ -466,7 +474,8 @@ class TrainGlobalConfig:
     verbose = True
     verbose_step = 1
     eval_mAP_on_test_sets = True
-    test_sets = ["private_dataset_no_crop_aabb", "web-collection-001-002_dataset_no_crop_aabb"]
+    #test_sets = ["private_dataset_no_crop_aabb", "web-collection-001-002_dataset_no_crop_aabb"]
+    test_sets = ["private170_dataset_no_crop_aabb"]
     # -------------------
 
     # --------------------
@@ -530,7 +539,7 @@ class VirtualDataLoader:
         return self.steps_per_epoch
 
 def run_training(net, output_folder, logger):
-    train_loader = torch.utils.data.DataLader(
+    train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=TrainGlobalConfig.batch_size,
         sampler=RandomSampler(train_dataset),
@@ -643,7 +652,8 @@ if __name__ == '__main__':
         #"a004_dataset_changan001_ped_bike_motor_384_768_3classes":          1.0
         "0018_syq4_dataset_768_768_obb_bus":                                1.0,
         "0019_gm7_dataset_768_768_obb_bus":                                 1.0,
-        "0020_web-collection-003_888_768_768_obb":                          1.0,
+        #"0020_web-collection-003_888_768_768_obb":                          1.0,
+        "0020_web-collection-003_1184_768_768_obb":                         1.0,
     })
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
@@ -688,4 +698,5 @@ if __name__ == '__main__':
     copyfile(sys.argv[0], os.path.join(output_path, os.path.split(sys.argv[0])[-1]))
     copyfile("infer.py", os.path.join(output_path, "infer.py"))
     run_training(net, output_path, logger)
+    time.sleep(600)
 
