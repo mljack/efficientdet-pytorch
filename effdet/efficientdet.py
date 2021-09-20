@@ -474,8 +474,10 @@ class EfficientDet(nn.Module):
                     _init_weight(m, n)
 
     def forward(self, x):
+        #import pdb;pdb.set_trace()
         x = self.backbone(x)
         x = self.fpn(x)
         x_class = self.class_net(x)
         x_box = self.box_net(x)
+        #print(x_class, x_box)
         return x_class, x_box

@@ -138,14 +138,24 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
         boxes_level = []
         for config in configs:
             stride, octave_scale, aspect = config
-            if image_size % stride != 0:
-                raise ValueError("input size must be divided by the stride.")
+            if not isinstance(image_size, int) and len(image_size) > 1:
+                if image_size[0] % stride != 0:
+                    raise ValueError("input size[0] must be divided by the stride.")
+                if image_size[1] % stride != 0:
+                    raise ValueError("input size[1] must be divided by the stride.")
+            else:
+                if image_size % stride != 0:
+                    raise ValueError("input size must be divided by the stride.")
             base_anchor_size = anchor_scale * stride * 2 ** octave_scale
             anchor_size_x_2 = base_anchor_size * aspect[0] / 2.0
             anchor_size_y_2 = base_anchor_size * aspect[1] / 2.0
 
-            x = np.arange(stride / 2, image_size, stride)
-            y = np.arange(stride / 2, image_size, stride)
+            if not isinstance(image_size, int) and len(image_size) > 1:
+                x = np.arange(stride / 2, image_size[0], stride)
+                y = np.arange(stride / 2, image_size[1], stride)
+            else:
+                x = np.arange(stride / 2, image_size, stride)
+                y = np.arange(stride / 2, image_size, stride)
             xv, yv = np.meshgrid(x, y)
             xv = xv.reshape(-1)
             yv = yv.reshape(-1)
@@ -210,8 +220,8 @@ def generate_detections(
 
     # apply bounding box regression to anchors
     boxes = decode_box_outputs(box_outputs.float(), anchor_boxes, output_xyxy=True)
-    if img_scale is not None and img_size is not None:
-        boxes = clip_boxes_xyxy(boxes, img_size / img_scale)  # clip before NMS better?
+    #if img_scale is not None and img_size is not None:
+    #    boxes = clip_boxes_xyxy(boxes, img_size / img_scale)  # clip before NMS better?
 
     scores = cls_outputs.sigmoid().squeeze(1).float()
     if soft_nms:
