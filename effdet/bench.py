@@ -33,7 +33,9 @@ def _post_process(config, cls_outputs, box_outputs):
         box_outputs[level].permute(0, 2, 3, 1).reshape([batch_size, -1, 4])
         for level in range(config.num_levels)], 1)
 
-    _, cls_topk_indices_all = torch.topk(cls_outputs_all.reshape(batch_size, -1), dim=1, k=MAX_DETECTION_POINTS)
+    #import pdb;pdb.set_trace()
+    cls = cls_outputs_all.reshape(batch_size, -1)
+    _, cls_topk_indices_all = torch.topk(cls, dim=1, k=MAX_DETECTION_POINTS)
     indices_all = cls_topk_indices_all // config.num_classes
     classes_all = cls_topk_indices_all % config.num_classes
 
@@ -48,7 +50,7 @@ def _post_process(config, cls_outputs, box_outputs):
     return cls_outputs_all_after_topk, box_outputs_all_after_topk, indices_all, classes_all
 
 
-@torch.jit.script
+#@torch.jit.script
 def _batch_detection(batch_size: int, class_out, box_out, anchor_boxes, indices, classes, img_scale, img_size):
     batch_detections = []
     # FIXME we may be able to do this as a batch with some tensor reshaping/indexing, PR welcome
@@ -56,6 +58,7 @@ def _batch_detection(batch_size: int, class_out, box_out, anchor_boxes, indices,
         detections = generate_detections(
             class_out[i], box_out[i], anchor_boxes, indices[i], classes[i], img_scale[i], img_size[i])
         batch_detections.append(detections)
+        #import pdb;pdb.set_trace()
     return torch.stack(batch_detections, dim=0)
 
 

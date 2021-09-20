@@ -13,6 +13,7 @@ from torch.utils.data import Dataset,DataLoader
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 import cv2
+import skimage
 import gc
 from matplotlib import pyplot as plt
 from .effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
@@ -32,7 +33,7 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config = get_efficientdet_config(model_name)
     net = EfficientDet(config, pretrained_backbone=False)
 
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:0')
     net = net.to(device)
 
     config.num_classes = num_classes
@@ -41,7 +42,7 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
 
     if not os.path.isabs(checkpoint_path):
         checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
-    checkpoint = torch.load(checkpoint_path, map_location='cuda:1')
+    checkpoint = torch.load(checkpoint_path, map_location='cuda:0')
     net.load_state_dict(checkpoint['model_state_dict'])
 
     del checkpoint
@@ -347,7 +348,9 @@ def find_the_right_crop_size(net, config, common_vehicle_width, img_path = None,
 
     angle_step = 15
     angles = [float(v) for v in range(0, 90, angle_step)]
-    settings = [384, 768, 768*2, 768*3, 768*4, 768*5]
+    #settings = [384, 768, 768*2, 768*3, 768*4, 768*5]
+    settings = [384, 768, 768*2]
+    #settings = [768*5, 768*8, 768*10, 768*15]
     boxes = []
     if img_path is not None:
         np_img = cv2.imread(img_path, cv2.IMREAD_COLOR)
@@ -375,6 +378,10 @@ def find_the_right_crop_size(net, config, common_vehicle_width, img_path = None,
             else:
                 width, length = math.sqrt(width2) , math.sqrt(length2)
             boxes.append([length, width])
+    if len(boxes) == 2:
+        return int(768.0 * 0.5 * (boxes[0][1]+boxes[1][1]) / common_vehicle_width)
+    if len(boxes) == 1:
+        return int(768.0 * boxes[0][1] / common_vehicle_width)
     if len(boxes) < 3:
         return 768
     kmeans = KMeans(n_clusters=3, random_state=0).fit(boxes)
@@ -382,8 +389,31 @@ def find_the_right_crop_size(net, config, common_vehicle_width, img_path = None,
     print(np.bincount(kmeans.labels_))
     common_box = kmeans.cluster_centers_[np.argmax(np.bincount(kmeans.labels_))]
     print(common_box)
-    return int(768.0 * common_box[1] / common_vehicle_width)
+    return int(768.0 * common_box[1] / common_vehicle_width), common_box
 
+def build_vehicle_markers(results, angle_step):
+    markers = []
+    id = -1
+    for obj in results:
+        if obj["box_count"] < 90 // angle_step * 0.5:
+            continue
+        id += 1
+        m = {
+            "frame_id": 0,
+            "heading_angle": round(obj["angle"], 1),
+            "id": id,
+            "width": obj["width"],
+            "length": obj["length"],
+            "manually_keyed": False,
+            "score": round(obj["score"], 6),
+            "certainty": round(obj["certainty"], 6),
+            "certainty2": round(obj["certainty2"], 6),
+            "x": obj["center"][0],
+            "y": obj["center"][1]
+        }
+        markers.append([m])
+    return markers
+                        
 def run(path, angles, common_vehicle_width=None, model_path=None):
     net, config = init_net(model_path)
 
@@ -398,70 +428,107 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
             os.mkdir(output_base_path)
         for item in os.listdir(path):
             ext = item[item.rfind(".")+1:]
-            if ext.lower() not in ("png", "jpg", "jpeg", "bmp"):
-                continue
+            if ext.lower() in ("png", "jpg", "jpeg", "bmp"):
+                print(item)
+                img_path = os.path.join(path, item)
+                output_path = os.path.join(output_base_path, item)
 
-            print(item)
-            img_path = os.path.join(path, item)
-            output_path = os.path.join(output_base_path, item)
-
-            if config.want_obb_result:
-                marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
-                if marker_path is not None and os.path.exists(marker_path):
-                    continue
-
-            start = time.time()
-            config.img_name = output_path[0:output_path.rfind(".")]+".jpg"
-            if common_vehicle_width is not None:
-                attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
-                config.save_img = False
-                print(attrs_json_path)
-                if os.path.exists(attrs_json_path):
-                    with open(attrs_json_path) as f:
-                        attrs = json.load(f)
-                    config.crop_size = int(768.0 * attrs["MostCommonVehicleWidthInPixels"] / common_vehicle_width)
-                else:
-                    config.crop_size = find_the_right_crop_size(net, config, common_vehicle_width, img_path=img_path, delay=1)
-                config.overlap_size = int(config.crop_size * 200.0 / 768.0) // 2 * 2
-                print("crop: %d/%d" % (config.overlap_size, config.crop_size))
-            if config.want_obb_result:
-                angle_step = 5
-                results = predict_obb(net, config, angle_step, img_path=img_path, delay=1)
-                markers = []
-                id = -1
-                for obj in results:
-                    if obj["box_count"] < 90 // angle_step * 0.5:
+                if config.want_obb_result:
+                    marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
+                    if marker_path is not None and os.path.exists(marker_path):
                         continue
-                    id += 1
-                    m = {
-                        "frame_id": 0,
-                        "heading_angle": round(obj["angle"], 1),
-                        "id": id,
-                        "width": obj["width"],
-                        "length": obj["length"],
-                        "manually_keyed": False,
-                        "score": round(obj["score"], 6),
-                        "certainty": round(obj["certainty"], 6),
-                        "certainty2": round(obj["certainty2"], 6),
-                        "x": obj["center"][0],
-                        "y": obj["center"][1]
-                    }
-                    markers.append([m])
-                marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
-                if marker_path is not None:
-                    with open(marker_path, "w") as f:
-                        f.write(pprint.pformat(markers, width=300, indent=1).replace("'", "\"").replace("True", "true").replace("False", "false"))
 
-            else:
-                config.save_img = True
-                results = predict(net, config, angle=0.0, img_path=img_path, want_aabb=True, delay=1)
-                txt_path = output_path[0:output_path.rfind(".")]+".txt" if config.save_result else None
-                if txt_path is not None:
-                    with open(txt_path, "w") as f:
-                        for result in results:
-                            box = result["box"]
-                            f.write("vehicle %f %f %f %f %f\n" % (result["score"], box[0], box[1], box[2], box[3]))
-                print("[%s]: Found %3d vehicles in %.3fs" % (item, len(results), time.time() - start))
+                start = time.time()
+                config.img_name = output_path[0:output_path.rfind(".")]+".jpg"
+                if common_vehicle_width is not None:
+                    attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
+                    config.save_img = False
+                    print(attrs_json_path)
+                    if os.path.exists(attrs_json_path):
+                        with open(attrs_json_path) as f:
+                            attrs = json.load(f)
+                        config.crop_size = int(768.0 * attrs["MostCommonVehicleWidthInPixels"] / common_vehicle_width)
+                    else:
+                        config.crop_size, _ = find_the_right_crop_size(net, config, common_vehicle_width, img_path=img_path, delay=1)
+                    config.overlap_size = int(config.crop_size * 200.0 / 768.0) // 2 * 2
+                    print("common_vehicle_width: %f\tcrop: %d/%d" % (common_vehicle_width, config.overlap_size, config.crop_size))
+                if config.want_obb_result:
+                    angle_step = 5
+                    results = predict_obb(net, config, angle_step, img_path=img_path, delay=1)
+                    markers = build_vehicle_markers(result, angle_step)
+                    marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
+                    if marker_path is not None:
+                        with open(marker_path, "w") as f:
+                            f.write(pprint.pformat(markers, width=300, indent=1).replace("'", "\"").replace("True", "true").replace("False", "false"))
+                else:
+                    config.save_img = True
+                    results = predict(net, config, angle=0.0, img_path=img_path, want_aabb=True, delay=1)
+                    txt_path = output_path[0:output_path.rfind(".")]+".txt" if config.save_result else None
+                    if txt_path is not None:
+                        with open(txt_path, "w") as f:
+                            for result in results:
+                                box = result["box"]
+                                f.write("vehicle %f %f %f %f %f\n" % (result["score"], box[0], box[1], box[2], box[3]))
+                    print("[%s]: Found %3d vehicles in %.3fs" % (item, len(results), time.time() - start))
+            elif ext.lower() in ("mpg", "mpeg", "mov", "mp4"):
+                video_path = os.path.join(path, item)
+                torch.backends.cudnn.benchmark = True
+                video = cv2.VideoCapture(video_path)
+                fps = video.get(cv2.CAP_PROP_FPS)
+                frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+                print(item)
+                print("FPS:\t\t%6.2f" % fps)
+                print("Frame Count:\t", frame_count)
+                base = os.path.join(path, "_video_det")
+                if not os.path.isdir(base):
+                    os.mkdir(base)
+                has_frame = True
+                #background_extractor = cv2.createBackgroundSubtractorMOG2()
+                for frame_id in range(0, frame_count, config.video_frame_sample_step):
+                    video.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
+                    has_frame, img = video.read()
+                    if not has_frame:
+                        break
+
+                    output_name = item[0:item.rfind(".")]+("_%06d"%frame_id)
+                    marker_path = os.path.join(base, output_name+".vehicle_markers.json")
+                    img_path = os.path.join(base, output_name+".jpg")
+                    img2 = skimage.measure.block_reduce(img, (4,4,1) if len(img.shape) == 3 else (4,4), np.mean)
+                    img2 = img2.astype(np.uint8)
+                    img2 = cv2.blur(img2, (3, 3))                     
+                    #background_mask = background_extractor.apply(img2).astype(np.uint8)
+                    if frame_id == 0:
+                        continue
+
+                    #cv2.imshow("bg", background_mask)
+                    cv2.imwrite(img_path, img)
+                    #cv2.imwrite(img_path.replace(".jpg", "_bg.png"), background_mask)
+
+                    if common_vehicle_width is not None:
+                        attrs_json_path = os.path.join(path, "all.video_attrs.json")
+                        config.save_img = False
+                        if os.path.exists(attrs_json_path):
+                            with open(attrs_json_path) as f:
+                                attrs = json.load(f)
+                            config.crop_size = int(768.0 * attrs["MostCommonVehicleWidthInPixels"] / common_vehicle_width)
+                        else:
+                            config.crop_size, common_vehicle_size = find_the_right_crop_size(net, config, common_vehicle_width, img_path=img_path, delay=1)
+                            with open(attrs_json_path, "w") as f:
+                                attrs_json = {"MostCommonVehicleLengthInPixels":common_vehicle_size[0], "MostCommonVehicleWidthInPixels":common_vehicle_size[1]}
+                                f.write(pprint.pformat(attrs_json, width=300, indent=1).replace("'", "\"").replace("True", "true").replace("False", "false"))
+                            print("common_vehicle_width: %f\tcrop: %d/%d" % common_vehicle_size[1])
+
+                        config.overlap_size = int(config.crop_size * 200.0 / 768.0) // 2 * 2
+                        print("crop: %d/%d" % (config.overlap_size, config.crop_size))
+
+                    start = time.time()
+                    angle_step = 5
+                    results = predict_obb(net, config, angle_step, img_path=img_path, delay=1)
+                    markers = build_vehicle_markers(results, angle_step)
+                    if marker_path is not None:
+                        with open(marker_path, "w") as f:
+                            f.write(pprint.pformat(markers, width=300, indent=1).replace("'", "\"").replace("True", "true").replace("False", "false"))
+                    print("[%s][%06d]: %.3fs" % (item, frame_id, time.time() - start))                
         return
  
     ext = path[path.rfind(".")+1:]
@@ -505,12 +572,51 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
                     angles = [float(a) for a in range(0, 90, 5)]
                 else:
                     angles = [0.0]
+                angles = [0.0]
             for angle in angles:
                 result = predict(net, config, angle, np_img=img)
                 if json_path is not None:
                     with open(json_path.replace(".json", "_%02d.json" % int(angle)), "w") as f:
                         json.dump(result, f, indent=1)
             print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
+    elif path == "camera":
+        show_img = True
+        save_result = False
+        want_obb_result = False
+        torch.backends.cudnn.benchmark = True
+        video = cv2.VideoCapture(0)
+        video.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        video.set(cv2.CAP_PROP_FRAME_WIDTH, 4096)
+        video.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+        video.set(cv2.CAP_PROP_PAN, 0)
+        video.set(cv2.CAP_PROP_TILT, 36000)
+        video.set(cv2.CAP_PROP_ZOOM, 0)
+        video.set(cv2.CAP_PROP_FOCUS, 0)
+        video.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        count = -1
+        has_frame = True
+        t0 = time.time()
+        while has_frame:
+            count += 1
+            has_frame, img = video.read()
+            if not has_frame:
+                break
+            if 0:
+                t1 = time.time()
+                print("%.3fs" % (t1-t0))
+                t0 = t1
+            if 0:
+                cv2.namedWindow("test", cv2.WND_PROP_FULLSCREEN)
+                cv2.setWindowProperty("test",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+                cv2.imshow("test", img)
+                k = cv2.waitKey(1)
+                if k == 27:
+                    exit(0)
+            if 1:
+                print(img.shape)
+                start = time.time()
+                result = predict(net, config, 0.0, np_img=img)
+                print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
 
 def init_net(model_path = None):
     class Config:
@@ -522,6 +628,7 @@ def init_net(model_path = None):
         save_result = True
         want_obb_result = False
         result_format = "json"
+        video_frame_sample_step = 90
         #result_format = "txt"
 
     config = Config()
@@ -547,7 +654,7 @@ def init_net(model_path = None):
         net = load_net(model_name, config.image_scale, num_classes, 'effdet-d3-drone_004_896_1792_bs2_epoch6/best-checkpoint-000epoch.bin')
         #net = load_net(model_name, config.image_scale, num_classes, 'effdet-d3-drone_004_896_1792_bs2_epoch6/last-checkpoint.bin')
     if 1:
-        config.crop_size = 768
+        config.crop_size = int(768)
         config.image_scale = 768
         config.overlap_size = 200
         config.batch_size = 32
@@ -587,7 +694,7 @@ def init_net(model_path = None):
 
 def main():
     if torch.cuda.device_count() > 1:
-        torch.cuda.set_device(1)
+        torch.cuda.set_device(0)
         print("Select [%s]" % torch.cuda.get_device_name(torch.cuda.current_device()))
 
     print(sys.argv)
