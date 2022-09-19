@@ -16,8 +16,8 @@ import cv2
 import skimage
 import gc
 from matplotlib import pyplot as plt
-from .effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
-from .effdet.efficientdet import HeadNet
+from effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
+from effdet.efficientdet import HeadNet
 
 import warnings
 warnings.simplefilter("ignore")
@@ -329,7 +329,7 @@ def dist2(p1, p2):
     return (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2
 
 def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np_img = None, delay = 1):
-    from .track import track
+    from track import track
     angles = [float(v) for v in range(0, 90, angle_step)]
     #angles = [0.0]
     results = []
@@ -455,7 +455,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
                 if config.want_obb_result:
                     angle_step = 5
                     results = predict_obb(net, config, angle_step, img_path=img_path, delay=1)
-                    markers = build_vehicle_markers(result, angle_step)
+                    markers = build_vehicle_markers(results, angle_step)
                     marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
                     if marker_path is not None:
                         with open(marker_path, "w") as f:
@@ -626,7 +626,7 @@ def init_net(model_path = None):
         img_name = "save_16.png"
         img_suffix = ""
         save_result = True
-        want_obb_result = False
+        want_obb_result = True
         result_format = "json"
         video_frame_sample_step = 90
         #result_format = "txt"

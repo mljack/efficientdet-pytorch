@@ -3,7 +3,7 @@ import torch.distributed as dist
 import abc
 import json
 from .distributed import synchronize, is_main_process, all_gather_container
-from pycocotools.cocoeval import COCOeval
+#from pycocotools.cocoeval import COCOeval
 
 
 class Evaluator:

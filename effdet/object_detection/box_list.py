@@ -36,7 +36,7 @@ import torch
 from typing import Optional, List, Dict
 
 
-@torch.jit.script
+#@torch.jit.script
 class BoxList(object):
     """Box collection."""
     data: Dict[str, torch.Tensor]

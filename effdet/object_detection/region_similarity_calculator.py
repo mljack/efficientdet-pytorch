@@ -73,7 +73,7 @@ def iou(boxlist1: BoxList, boxlist2: BoxList):
     return torch.where(intersections == 0.0, torch.zeros_like(intersections), intersections / unions)
 
 
-@torch.jit.script
+#@torch.jit.script
 class IouSimilarity(object):
     """Class to compute similarity based on Intersection over Union (IOU) metric.
 
