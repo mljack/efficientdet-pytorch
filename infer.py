@@ -33,8 +33,8 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config = get_efficientdet_config(model_name)
     net = EfficientDet(config, pretrained_backbone=False)
 
-    device = torch.device('cuda:0')
-    net = net.to(device)
+    #device = torch.device('cuda:0')
+    #net = net.to(device)
 
     config.num_classes = num_classes
     config.image_size = image_scale
@@ -42,7 +42,7 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
 
     if not os.path.isabs(checkpoint_path):
         checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
-    checkpoint = torch.load(checkpoint_path, map_location='cuda:0')
+    checkpoint = torch.load(checkpoint_path, map_location='cuda:1')
     net.load_state_dict(checkpoint['model_state_dict'])
 
     del checkpoint
@@ -50,8 +50,6 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
 
     net = DetBenchPredict(net, config)
     net.eval()
-    return net.cuda()
-
     return net.cuda()
 
 def make_predictions(images, net, score_threshold=0.22):
@@ -621,7 +619,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
 def init_net(model_path = None):
     class Config:
         box_color = None
-        show_img = True
+        show_img = False
         save_img = False
         img_name = "save_16.png"
         img_suffix = ""
@@ -694,7 +692,7 @@ def init_net(model_path = None):
 
 def main():
     if torch.cuda.device_count() > 1:
-        torch.cuda.set_device(0)
+        torch.cuda.set_device(1)
         print("Select [%s]" % torch.cuda.get_device_name(torch.cuda.current_device()))
 
     print(sys.argv)

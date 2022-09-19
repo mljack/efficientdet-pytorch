@@ -74,6 +74,20 @@ def obb_to_aabb(bbox, **kwargs):
     bbox2 = (min(xx1, xx2, xx3, xx4), min(yy1, yy2, yy3, yy4), max(xx1, xx2, xx3, xx4), max(yy1, yy2, yy3, yy4))
     return bbox2
 
+def get_aabb_transforms():
+    return A.Compose(
+        [
+            A.Lambda(bbox=obb_to_aabb, always_apply=True, use_obb=True, p=1.0),
+        ], 
+        p=1.0, 
+        bbox_params=A.BboxParams(
+            format='pascal_voc',
+            min_area=0, 
+            min_visibility=0,
+            label_fields=['labels']
+        )
+    )
+
 def get_train_transforms():
     return A.Compose(
         [
@@ -160,16 +174,17 @@ def get_valid_transforms2(img_scale):
 class_id_maps = {5:2, 7:2, 8:1}
 class_name_maps = ["bg", "ped", "bike", "motor"]
 
+prev_sample = None
 class DatasetRetriever(Dataset):
-    def __init__(self, root, box_scale, transform=None, transform2=None, test=False):
+    def __init__(self, root, box_scale, transform=None, transform2=None, aabb_transform=None, test=False):
         super(DatasetRetriever, self).__init__()
         if isinstance(root, torch._six.string_classes):
             root = os.path.expanduser(root)
         self.root = root
         self.transform = transform
         self.transform2 = transform2
+        self.aabb_transform = aabb_transform
         self.box_scale = box_scale
-        data_path = os.path.join(root, "obj")
         if test:
             list_path = os.path.join(root, "test.txt")
         else:
@@ -182,7 +197,8 @@ class DatasetRetriever(Dataset):
 
     def __getitem__(self, index):
         img_id = self.img_ids[index]
-        path = os.path.join(self.root,  self.img_names[index])
+        img_name = self.img_names[index]
+        path = os.path.join(self.root, img_name)
         image = cv2.imread(path, cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
@@ -218,13 +234,23 @@ class DatasetRetriever(Dataset):
         target['image_id'] = torch.tensor([index])
 
         if self.transform:
+            global prev_sample
+            done = False
             for i in range(10):
-                sample = self.transform(**{
-                    'image': image,
-                    'bboxes': target['boxes'],
-                    'labels': labels,
-                    'use_obb': True
-                })
+                if img_name.lower().find("_aabb/") != -1:
+                    sample = self.aabb_transform(**{
+                        'image': image,
+                        'bboxes': target['boxes'],
+                        'labels': labels,
+                        'use_obb': True
+                    })
+                else:
+                    sample = self.transform(**{
+                        'image': image,
+                        'bboxes': target['boxes'],
+                        'labels': labels,
+                        'use_obb': True
+                    })
                 sample = self.transform2(**{
                     'image': sample['image'],
                     'bboxes': sample['bboxes'],
@@ -241,9 +267,14 @@ class DatasetRetriever(Dataset):
                     target['labels'] = torch.stack(sample['labels']) # <--- add this!
                     #print(target['boxes'].shape, target['labels'].shape)
                     #assert len(sample['bboxes']) == labels.shape[0], 'not equal!'
+                    done = True
                     break
-
-        return image, target, img_id
+        
+        if prev_sample is not None and not done:
+            return prev_sample
+        prev_sample = image, target, img_id, img_name
+        #print(target['boxes'].shape, target['labels'].shape)
+        return prev_sample
 
     def __len__(self):
         return len(self.img_ids)
@@ -363,7 +394,7 @@ class Fitter:
         self.model.eval()
         summary_loss = AverageMeter()
         t = time.time()
-        for step, (images, targets, image_ids) in enumerate(val_loader):
+        for step, (images, targets, image_ids, image_paths) in enumerate(val_loader):
             if self.config.verbose:
                 if step % self.config.verbose_step == 0:
                     print(
@@ -396,7 +427,7 @@ class Fitter:
         self.model.train()
         summary_loss = AverageMeter()
         t = time.time()
-        for step, (images, targets, image_ids) in enumerate(train_loader):
+        for step, (images, targets, image_ids, image_paths) in enumerate(train_loader):
             if self.config.verbose:
                 if step % self.config.verbose_step == 0:
                     print(
@@ -412,7 +443,10 @@ class Fitter:
                 print("Found non-tensor inputs!")
                 print(images)
                 print([image.shape for image in images])
-                images = [torch.tensor(image) for image in images]
+                print(image_paths)
+                for idx, image in enumerate(images):
+                    if not isinstance(image, torch.Tensor):
+                        images[idx] = ToTensorV2()(image=image)['image']
                 images = torch.stack(images)
 
             images = images.to(self.device).float() / 255.0
@@ -504,7 +538,7 @@ class TrainGlobalConfig:
         threshold=0.0001,
         threshold_mode='abs',
         cooldown=0, 
-        min_lr=1e-8,
+        min_lr=lr/16,
         eps=1e-08
     )
     
@@ -513,7 +547,6 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 class VirtualDataLoader:
-
     def __init__(self, data_loader, steps_per_epoch: int = 1000):
         self.data_loader = data_loader
         self.iterator = iter(self.data_loader)
@@ -538,6 +571,40 @@ class VirtualDataLoader:
     def __len__(self):
         return self.steps_per_epoch
 
+class SafeDataLoader:
+    def __init__(self, data_loader):
+        self.data_loader = data_loader
+        self.iterator = iter(self.data_loader)
+        self.current_step = 0
+        self.total_steps = len(self.data_loader)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current_step < self.total_steps:
+            self.current_step += 1
+            while True:
+                try:
+                    return next(self.iterator)
+                except ValueError:
+                    # Skip invalid data and continue,
+                    #   such as complaints from check_bbox() of albumentations
+                    if 0:
+                        import traceback
+                        traceback.print_exc()
+                        print("="*80)
+                    continue
+                except StopIteration:
+                    self.iterator = iter(self.data_loader)
+                    return next(self.iterator)
+        else:
+            self.current_step = 0
+            raise StopIteration
+
+    def __len__(self):
+        return len(self.data_loader)
+
 def run_training(net, output_folder, logger):
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -557,12 +624,13 @@ def run_training(net, output_folder, logger):
         pin_memory=False,
         collate_fn=collate_fn,
     )
+    fitter = Fitter(model=net, device=device, config=TrainGlobalConfig, output_folder=output_folder, logger=logger)
+    train_loader = SafeDataLoader(train_loader)
+    train_loader = VirtualDataLoader(train_loader, TrainGlobalConfig.samples_per_virtual_epoch // TrainGlobalConfig.batch_size)
+    val_loader = SafeDataLoader(val_loader)
     val_loader.eval_mAP_on_test_sets = TrainGlobalConfig.eval_mAP_on_test_sets
     val_loader.test_sets = TrainGlobalConfig.test_sets
-
-    fitter = Fitter(model=net, device=device, config=TrainGlobalConfig, output_folder=output_folder, logger=logger)
-    virtual_train_loader = VirtualDataLoader(train_loader, TrainGlobalConfig.samples_per_virtual_epoch // TrainGlobalConfig.batch_size)
-    fitter.fit(virtual_train_loader, val_loader)
+    fitter.fit(train_loader, val_loader)
 
 def build_net(type, img_scale, num_classes):
     config = effdet.get_efficientdet_config(type)
@@ -597,6 +665,7 @@ def build_dataset(names, filters, output_name, logger):
 
     total = len(all_img)
     train_n = int(total * 0.95)
+    #train_n = total - 8
     train_set = []
     test_set = []
 
@@ -654,6 +723,12 @@ if __name__ == '__main__':
         "0019_gm7_dataset_768_768_obb_bus":                                 1.0,
         #"0020_web-collection-003_888_768_768_obb":                          1.0,
         "0020_web-collection-003_1184_768_768_obb":                         1.0,
+        #"0021_test_different_resolutions":                                  1.0,
+        "0022_UAV-ROD_dataset":                                              1.0,
+        "0023_VSAI_dataset":                                                 1.0,
+        "0024_DroneVehicle_dataset":                                         1.0,
+        "0025_VAID_dataset_aabb":                                            1.0,
+        "0026_VEDAI_dataset":                                                1.0,
     })
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
@@ -668,15 +743,17 @@ if __name__ == '__main__':
     logger.log("img_scale:\t%d" % img_scale)
     logger.log("box_scale:\t%d" % box_scale)
     dataset_path = build_dataset(datasets, {".jpg", ".jpeg", ".png", ".bmp"}, output_name, logger)
-    train_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_train_transforms(), transform2=get_train_transforms2(img_scale), test=False)
-    validation_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_valid_transforms(), transform2=get_train_transforms2(img_scale), test=True)
+    train_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_train_transforms(), transform2=get_train_transforms2(img_scale), aabb_transform=get_aabb_transforms(), test=False)
+    validation_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_valid_transforms(), transform2=get_train_transforms2(img_scale), aabb_transform=get_aabb_transforms(), test=True)
     logger.log("Batch Size:   %9d" % TrainGlobalConfig.batch_size)
     logger.log("Learning Rate: %f" % TrainGlobalConfig.lr)
     logger.log("Num of Epoch:  %d" % TrainGlobalConfig.n_epochs)
     logger.log(TrainGlobalConfig.SchedulerClass)
 
+    #torch.cuda.empty_cache()
+
     if 0:
-        for i, (img, target, img_id) in enumerate(train_dataset):
+        for i, (img, target, img_id, img_path) in enumerate(train_dataset):
             img = img.permute(1,2,0).cpu().numpy()
             boxes = target['boxes'].cpu().numpy().astype(np.int32)
             class_ids = target['labels'].cpu().numpy().astype(np.int32)
