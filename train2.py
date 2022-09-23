@@ -18,12 +18,14 @@ from torch.utils.data import Dataset,DataLoader
 from torch.utils.data.sampler import SequentialSampler, RandomSampler
 from glob import glob
 import warnings
+from tensorboardX import SummaryWriter
 
 import effdet
 
 warnings.filterwarnings("ignore")
 dataset_path_base = "_datasets"
 model_path_base = "_models"
+writer = SummaryWriter()
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -318,7 +320,19 @@ def eval_mAP(test_datasets, model_path):
             f.write("echo " + model_path + " | tee -a " + mAP_log_path + "\n")
             f.write(infer_cmd + "\n")
             f.write(eval_cmd + " | tee -a " + mAP_log_path + "\n")
-    subprocess.Popen(["/bin/bash", bash_output], cwd = "..")
+    process = subprocess.Popen(["/bin/bash", bash_output], cwd = "..", stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+    out, err = subprocess.Popen(['ls','-l'], stdout=subprocess.PIPE).communicate()
+    APs = [-0.0001] * 11
+    c = 0
+    for line in out.splitlines():
+        line = line.strip()
+        print(line)
+        if line.find("DETAIL:") == 0:
+            c += 1
+        if c == 4:
+            APs = [float(s) for s in line.replace("DETAIL:| ", "").replace("% |", "").split(" ")]
+    print(APs)
+    return APs[-1], APs[:-1]
 
 class Fitter:
     def __init__(self, model, device, config, output_folder, logger):
@@ -367,12 +381,15 @@ class Fitter:
             summary_loss = self.train_one_epoch(train_loader)
 
             self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                  ')
+            writer.add_scalar('train_loss', summary_loss.avg, self.epoch)
             self.save(f'{self.base_dir}/last-checkpoint.bin')
 
             t = time.time()
             summary_loss = self.validation(validation_loader)
 
             self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                   ')
+            writer.add_scalar('val_loss', summary_loss.avg, self.epoch)
+
             if summary_loss.avg < self.best_summary_loss:
                 self.best_summary_loss = summary_loss.avg
             self.model.eval()
@@ -383,7 +400,13 @@ class Fitter:
 
             if validation_loader.eval_mAP_on_test_sets:
                 # Launch mAP evaluation on the secondary video card
-                eval_mAP(validation_loader.test_sets, model_path)
+                mAP, APs = eval_mAP(validation_loader.test_sets, model_path)
+                writer.add_scalar('test_AP_0.50-0.95', mAP, self.epoch)
+                writer.add_scalar('test_AP_0.95', APs[-1], self.epoch)
+                writer.add_scalar('test_AP_0.90', APs[-2], self.epoch)
+                writer.add_scalar('test_AP_0.85', APs[-3], self.epoch)
+                writer.add_scalar('test_AP_0.80', APs[-4], self.epoch)
+                writer.add_scalar('test_AP_0.75', APs[-5], self.epoch)
 
             if self.config.validation_scheduler:
                 self.scheduler.step(metrics=summary_loss.avg)

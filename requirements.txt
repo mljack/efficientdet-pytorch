@@ -14,3 +14,6 @@ numpy<=1.17.5
 matplotlib
 
 omegaconf>=2.0
+
+tensorboardX
+crc32c
