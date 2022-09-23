@@ -33,8 +33,9 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
     config = get_efficientdet_config(model_name)
     net = EfficientDet(config, pretrained_backbone=False)
 
-    #device = torch.device('cuda:0')
-    #net = net.to(device)
+    device_str = 'cuda:1' if torch.cuda.device_count() > 1 else 'cuda:0'
+    device = torch.device(device_str)
+    net = net.to(device)
 
     config.num_classes = num_classes
     config.image_size = image_scale
@@ -42,7 +43,7 @@ def load_net(model_name, image_scale, num_classes, checkpoint_path):
 
     if not os.path.isabs(checkpoint_path):
         checkpoint_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), checkpoint_path)
-    checkpoint = torch.load(checkpoint_path, map_location='cuda:1')
+    checkpoint = torch.load(checkpoint_path, map_location=device_str)
     net.load_state_dict(checkpoint['model_state_dict'])
 
     del checkpoint
@@ -377,11 +378,12 @@ def find_the_right_crop_size(net, config, common_vehicle_width, img_path = None,
                 width, length = math.sqrt(width2) , math.sqrt(length2)
             boxes.append([length, width])
     if len(boxes) == 2:
-        return int(768.0 * 0.5 * (boxes[0][1]+boxes[1][1]) / common_vehicle_width)
+        return int(768.0*0.5*(boxes[0][1]+boxes[1][1])/common_vehicle_width), (0.5*(boxes[0][0]+boxes[1][0]), 0.5*(boxes[0][1]+boxes[1][1]))
     if len(boxes) == 1:
-        return int(768.0 * boxes[0][1] / common_vehicle_width)
+        return int(768.0*boxes[0][1] / common_vehicle_width), boxes[0]
     if len(boxes) < 3:
-        return 768
+        width = 25
+        return 768, (width*2.5, width)
     kmeans = KMeans(n_clusters=3, random_state=0).fit(boxes)
     print(kmeans.cluster_centers_)
     print(np.bincount(kmeans.labels_))
@@ -411,9 +413,9 @@ def build_vehicle_markers(results, angle_step):
         }
         markers.append([m])
     return markers
-                        
-def run(path, angles, common_vehicle_width=None, model_path=None):
-    net, config = init_net(model_path)
+
+def run(path, angles, common_vehicle_width=None, model_path=None, want_obb=False):
+    net, config = init_net(model_path, want_obb)
 
     if len(angles) == 0:
         angles = [0.0]
@@ -453,7 +455,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
                 if config.want_obb_result:
                     angle_step = 5
                     results = predict_obb(net, config, angle_step, img_path=img_path, delay=1)
-                    markers = build_vehicle_markers(result, angle_step)
+                    markers = build_vehicle_markers(results, angle_step)
                     marker_path = output_path[0:output_path.rfind(".")]+".vehicle_markers.json" if config.save_result else None
                     if marker_path is not None:
                         with open(marker_path, "w") as f:
@@ -616,7 +618,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
                 result = predict(net, config, 0.0, np_img=img)
                 print("[%05d]: Found %3d vehicles in %.3fs" % (count, len(result), time.time() - start))
 
-def init_net(model_path = None):
+def init_net(model_path = None, want_obb = False):
     class Config:
         box_color = None
         show_img = False
@@ -624,7 +626,7 @@ def init_net(model_path = None):
         img_name = "save_16.png"
         img_suffix = ""
         save_result = True
-        want_obb_result = False
+        want_obb_result = want_obb
         result_format = "json"
         video_frame_sample_step = 90
         #result_format = "txt"
@@ -696,10 +698,14 @@ def main():
         print("Select [%s]" % torch.cuda.get_device_name(torch.cuda.current_device()))
 
     print(sys.argv)
-    if len(sys.argv) < 2 or len(sys.argv) > 4:
-        print("Usage: python infer.py test.jpg [30.0] [model_path.bin]")
+    if len(sys.argv) < 2 or len(sys.argv) > 5:
+        print("Usage: python infer.py test.jpg [30.0] [model_path.bin] [obb]")
     else:
-        run(sys.argv[1], [], common_vehicle_width=(float(sys.argv[2]) if len(sys.argv) > 2 else None), model_path=(sys.argv[3] if len(sys.argv) > 3 else None))
+        path = sys.argv[1]
+        width = float(sys.argv[2]) if len(sys.argv) > 2 else None
+        model_path = sys.argv[3] if len(sys.argv) > 3 else None
+        want_obb = sys.argv[4].lower() == "obb" if len(sys.argv) > 4 else False
+        run(path, [], common_vehicle_width=width, model_path=model_path, want_obb=want_obb)
 
 if __name__ == '__main__':
     main()
