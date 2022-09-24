@@ -702,7 +702,7 @@ def main():
         print("Usage: python infer.py test.jpg [30.0] [model_path.bin] [obb]")
     else:
         path = sys.argv[1]
-        width = float(sys.argv[2]) if len(sys.argv) > 2 else None
+        width = float(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] != "-1" else None
         model_path = sys.argv[3] if len(sys.argv) > 3 else None
         want_obb = sys.argv[4].lower() == "obb" if len(sys.argv) > 4 else False
         run(path, [], common_vehicle_width=width, model_path=model_path, want_obb=want_obb)
