@@ -92,7 +92,7 @@ def get_aabb_transforms():
 def get_train_transforms():
     return A.Compose(
         [
-            A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.5),
+            A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.9),
             A.Lambda(bbox=obb_to_aabb, always_apply=True, use_obb=True, p=1.0),
         ], 
         p=1.0, 
@@ -518,13 +518,13 @@ class Fitter:
         self.epoch = checkpoint['epoch'] + 1
 
 class TrainGlobalConfig:
-    num_workers = 4
-    batch_size = 4
-    n_epochs = 40
-    samples_per_virtual_epoch = 10000
+    num_workers = 8
+    batch_size = 8
+    n_epochs = 80
+    samples_per_virtual_epoch = 20000
     #lr = 0.01
     #lr = 0.001
-    lr = 0.0001
+    lr = 0.0002
     #lr = 0.00001
     #lr = 0.00003
     # -------------------
@@ -550,7 +550,6 @@ class TrainGlobalConfig:
         final_div_factor=10**5
     )
 
-    '''
     step_scheduler = False  # do scheduler.step after optimizer.step
     validation_scheduler = True  # do scheduler.step after validation stage loss
     SchedulerClass = torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -562,10 +561,18 @@ class TrainGlobalConfig:
         threshold=0.0001,
         threshold_mode='abs',
         cooldown=0, 
-        min_lr=lr/16,
+        min_lr=lr/32,
         eps=1e-08
     )
-    
+    '''
+    step_scheduler = True  # do scheduler.step after optimizer.step
+    validation_scheduler = False  # do scheduler.step after validation stage loss
+    SchedulerClass = torch.optim.lr_scheduler.MultiStepLR
+    scheduler_params = dict(
+        milestones=[30,40,50,60,70],
+        gamma=0.5,
+        verbose=True, 
+    )
 
 def collate_fn(batch):
     return tuple(zip(*batch))
@@ -752,7 +759,7 @@ if __name__ == '__main__':
         # "0023_VSAI_dataset":                                                 1.0,
         "0023_VSAI_dataset_2":                                                 1.0,
         "0024_DroneVehicle_dataset":                                         1.0,
-        "0025_VAID_dataset_aabb":                                            1.0,
+        #"0025_VAID_dataset_aabb":                                            1.0,
         "0026_VEDAI_dataset":                                                1.0,
     })
     output_name = 'effdet-d2-drone_'

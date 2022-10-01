@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+import numpy as np
 from tensorboardX import SummaryWriter
 
 
@@ -74,33 +75,45 @@ if __name__ == '__main__':
     for folder in write_folders:
         if os.path.exists(folder):
             shutil.rmtree(folder)
+    for item in os.listdir(log_path):
+        if item.find("AP95_50_avg_") != -1:
+            path = os.path.join(log_path, item)
+            shutil.rmtree(path)
 
     writers = [SummaryWriter(logdir=folder) for folder in write_folders]
     writer_train, writer_val, writer_mAP75, writer_mAP80, writer_mAP85, writer_mAP90, writer_mAP95, writer_mAP95_50 = writers
 
 
-    writer_mAP95.add_scalar('AP', 0.0, 0)
-    writer_mAP75.add_scalar('AP', 100.0, 0)
+    writer_mAP95.add_scalar('A/AP', 0.0, 0)
+    writer_mAP75.add_scalar('A/AP', 100.0, 0)
     results = load_mAP(log_path)
+    mAP95_50 = []
     for epoch, mAP, APs in results:
-        writer_mAP95_50.add_scalar('AP', mAP, epoch)
-        writer_mAP95.add_scalar('AP', APs[-1], epoch)
-        writer_mAP90.add_scalar('AP', APs[-2], epoch)
-        writer_mAP85.add_scalar('AP', APs[-3], epoch)
-        writer_mAP80.add_scalar('AP', APs[-4], epoch)
-        writer_mAP75.add_scalar('AP', APs[-5], epoch)
+        mAP95_50.append(mAP)
+        writer_mAP95_50.add_scalar('A/AP', mAP, epoch)
+        writer_mAP95.add_scalar('A/AP', APs[-1], epoch)
+        writer_mAP90.add_scalar('A/AP', APs[-2], epoch)
+        writer_mAP85.add_scalar('A/AP', APs[-3], epoch)
+        writer_mAP80.add_scalar('A/AP', APs[-4], epoch)
+        writer_mAP75.add_scalar('A/AP', APs[-5], epoch)
 
     results = load_lr_loss(log_path)
     for epoch, lr, train_loss, val_loss in results:
-        writer_train.add_scalar('loss', train_loss, epoch)
-        writer_train.add_scalar('lr', lr, epoch)
-        writer_val.add_scalar('loss', val_loss, epoch)
-    writer_train.add_scalar('loss', 0.0, epoch+3)
-    writer_train.add_scalar('lr', 0.0, epoch+3)
+        writer_train.add_scalar('A/loss', train_loss, epoch)
+        writer_train.add_scalar('A/lr', lr, epoch)
+        writer_val.add_scalar('A/loss', val_loss, epoch)
+    writer_train.add_scalar('A/loss', 0.0, epoch+1)
+    writer_train.add_scalar('A/lr', 0.0, epoch+1)
+
+    last_mAP95_50s = mAP95_50[-10:]
+    mAP95_50_avg = np.mean(last_mAP95_50s)
+    mAP95_50_absdev = np.mean(np.absolute(last_mAP95_50s - np.mean(last_mAP95_50s)))
+    writer_mAP95_50_avg = SummaryWriter(logdir=os.path.join(log_path, "AP95_50_avg_%.2f_%.2f" % (mAP95_50_avg, mAP95_50_absdev)))
+    writer_mAP95_50_avg.add_scalar('A/AP', mAP95_50_avg, epoch+1)
 
     for writer in writers:
         writer.close()
 
     if (len(sys.argv) <= 2 or sys.argv[2] != "--skip_board"):
-        os.system(f"/home/me/anaconda3/bin/tensorboard --logdir {log_path}")
+        os.system(f"/home/me/anaconda3/bin/tensorboard --logdir {log_path} --host 0.0.0.0")
 
