@@ -416,7 +416,7 @@ def build_vehicle_markers(results, angle_step):
         markers.append([m])
     return markers
 
-def run(path, angles, common_vehicle_width=None, model_path=None, want_obb=False):
+def run(path, angles, common_vehicle_width=None, model_path=None, want_obb=False, crop_size=None, common_vehicle_width_in_image=None):
     net, config = init_net(model_path, want_obb)
 
     if len(angles) == 0:
@@ -446,7 +446,11 @@ def run(path, angles, common_vehicle_width=None, model_path=None, want_obb=False
                     attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
                     config.save_img = False
                     print(attrs_json_path)
-                    if os.path.exists(attrs_json_path):
+                    if crop_size is not None:
+                        config.crop_size = int(crop_size)
+                    elif common_vehicle_width_in_image is not None:
+                        config.crop_size = int(768.0 * common_vehicle_width_in_image / common_vehicle_width)
+                    elif os.path.exists(attrs_json_path):
                         with open(attrs_json_path) as f:
                             attrs = json.load(f)
                         config.crop_size = int(768.0 * attrs["MostCommonVehicleWidthInPixels"] / common_vehicle_width)
@@ -700,14 +704,15 @@ def main():
         print("Select [%s]" % torch.cuda.get_device_name(torch.cuda.current_device()))
 
     print(sys.argv)
-    if len(sys.argv) < 2 or len(sys.argv) > 5:
-        print("Usage: python infer.py test.jpg [30.0] [model_path.bin] [obb]")
+    if len(sys.argv) < 2 or len(sys.argv) > 6:
+        print("Usage: python infer.py test.jpg [25] [model_path.bin] [obb] [17]")
     else:
         path = sys.argv[1]
         width = float(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] != "-1" else None
         model_path = sys.argv[3] if len(sys.argv) > 3 else None
         want_obb = sys.argv[4].lower() == "obb" if len(sys.argv) > 4 else False
-        run(path, [], common_vehicle_width=width, model_path=model_path, want_obb=want_obb)
+        common_vehicle_width_in_image = float(sys.argv[5]) if len(sys.argv) > 5 else None
+        run(path, [], common_vehicle_width=width, model_path=model_path, want_obb=want_obb, common_vehicle_width_in_image=common_vehicle_width_in_image)
 
 if __name__ == '__main__':
     main()
