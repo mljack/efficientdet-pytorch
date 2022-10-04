@@ -16,8 +16,8 @@ import cv2
 import skimage
 import gc
 from matplotlib import pyplot as plt
-from effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
-from effdet.efficientdet import HeadNet
+from .effdet import get_efficientdet_config, EfficientDet, DetBenchPredict
+from .effdet.efficientdet import HeadNet
 
 import warnings
 warnings.simplefilter("ignore")
@@ -52,8 +52,6 @@ def load_net(model_name, image_size, num_classes, checkpoint_path):
     net.eval()
     return net.cuda()
 
-    return net.cuda()
-
 def make_predictions(images, net, score_threshold=0.22):
     #ori_images = images
     images = torch.stack(images).float().cuda() / 255.0
@@ -62,8 +60,9 @@ def make_predictions(images, net, score_threshold=0.22):
         img_scale = torch.tensor([1]*images.shape[0]).float().cuda()
         img_size = [image.shape[-2:] for image in images]
         img_size = torch.tensor(img_size).float().cuda()
+        # print(img_scale, img_size)
+        # import pdb;pdb.set_trace()
         det = net(images, img_scale, img_size)
-        #import pdb;pdb.set_trace()
         for i in range(images.shape[0]):
             if 0:
                 a = ori_images[i].permute(1,2,0).cpu().numpy()
@@ -197,6 +196,8 @@ class DatasetRetriever(Dataset):
         
         w = (self.width + 127) // 128 * 128
         h = (self.height + 127) // 128 * 128
+        w = 3840
+        h = 2176
         crop_img = np.zeros((h, w, 3), np.uint8)
         crop_img[0:self.img.shape[0], 0:self.img.shape[1]] = self.img
 
@@ -322,7 +323,7 @@ def dist2(p1, p2):
     return (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2
 
 def predict_obb(net, config, angle_step=5, img_path = None, img_bytes = None, np_img = None, delay = 1):
-    from track import track
+    from .track import track
     angles = [float(v) for v in range(0, 90, angle_step)]
     #angles = [0.0]
     results = []
@@ -433,7 +434,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None):
 
                 start = time.time()
                 config.img_name = output_path[0:output_path.rfind(".")]+".jpg"
-                if common_vehicle_width is not None:
+                if common_vehicle_width is not None and 0:
                     attrs_json_path = img_path[0:img_path.rfind(".")]+".video_attrs.json"
                     config.save_img = False
                     print(attrs_json_path)
@@ -650,7 +651,7 @@ def init_net(model_path = None):
         config.crop_size = int(768)
         config.image_size = [3840, 2176]
         config.overlap_size = 200
-        config.batch_size = 32
+        config.batch_size = 1
         model_name = 'tf_efficientdet_d2'
         #net = load_net(model_name, config.image_size, num_classes, '_models/effdet-d2-drone_005_768_1536_bs4_epoch6/best-checkpoint-000epoch.bin')
         #net = load_net(model_name, config.image_size, num_classes, '_models/effdet-d2-drone_005_768_1536_bs4_epoch6/last-checkpoint.bin')

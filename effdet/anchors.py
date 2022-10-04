@@ -45,7 +45,7 @@ _DUMMY_DETECTION_SCORE = -1e5
 MAX_DETECTION_POINTS = 5000
 
 # The maximum number of detections per image.
-MAX_DETECTIONS_PER_IMAGE = 100
+MAX_DETECTIONS_PER_IMAGE = 500
 
 
 def decode_box_outputs(rel_codes, anchors, output_xyxy: bool=False):
