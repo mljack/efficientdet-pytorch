@@ -92,7 +92,7 @@ def get_aabb_transforms():
 def get_train_transforms():
     return A.Compose(
         [
-            A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.9),
+            A.Rotate(border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), use_obb=True, p=0.5),
             A.Lambda(bbox=obb_to_aabb, always_apply=True, use_obb=True, p=1.0),
         ], 
         p=1.0, 
@@ -303,6 +303,9 @@ import shutil
 import subprocess
 
 def eval_mAP(test_datasets, model_path):
+    APs = [-0.0001] * 11
+    #return APs[-1], APs[:-1]
+
     model_path = os.path.abspath(model_path)
     output_path = os.path.split(model_path)[0]
     mAP_log_path = os.path.join(output_path, "mAP.txt")
@@ -320,7 +323,6 @@ def eval_mAP(test_datasets, model_path):
             f.write(infer_cmd + "\n")
             f.write(eval_cmd + " | tee -a " + mAP_log_path + "\n")
     out, err = subprocess.Popen(["/bin/bash", bash_output], cwd = "..", stderr=subprocess.STDOUT, stdout=subprocess.PIPE).communicate()
-    APs = [-0.0001] * 11
     c = 0
     for line in out.splitlines():
         line = line.strip()
@@ -345,18 +347,20 @@ class Fitter:
         
         self.log_path = f'{self.base_dir}/log.txt'
         self.best_summary_loss = 10**5
+        self.step = 0
 
         self.model = model
         self.device = device
 
-        param_optimizer = list(self.model.named_parameters())
-        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-        optimizer_grouped_parameters = [
-            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
-            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ] 
+        #param_optimizer = list(self.model.named_parameters())
+        #no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        #optimizer_grouped_parameters = [
+        #    {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
+        #    {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        #] 
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.lr)
+        #self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.lr)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=config.lr, momentum=0.9)
         self.scheduler = config.SchedulerClass(self.optimizer, **config.scheduler_params)
         self.logger.log(f'Fitter prepared. Device is {self.device}')
 
@@ -365,10 +369,11 @@ class Fitter:
             from torch_lr_finder import LRFinder
             criterion = torch.nn.CrossEntropyLoss()
             lr_finder = LRFinder(self.model, self.optimizer, criterion, self.device)
-            lr_finder.range_test(train_loader, start_lr=0.000001, end_lr=0.01, num_iter=1000)
+            lr_finder.range_test(train_loader, start_lr=0.00001, end_lr=0.99, accumulation_steps=1, num_iter=200, step_mode="exp")
             lr_finder.plot()
-            plt.savefig("LRvsLoss.png")
+            plt.savefig("lr_finder_bs4.png")
             plt.close()
+            exit()
 
         for e in range(self.config.n_epochs):
             if self.config.verbose:
@@ -376,19 +381,19 @@ class Fitter:
                 timestamp = datetime.utcnow().isoformat()
                 self.logger.log(f'\n{timestamp}\nLR: {lr}')
 
-            writer_train.add_scalar("lr", lr, self.epoch+1)
+            writer_train.add_scalar("A/lr", lr, self.epoch+1)
             t = time.time()
             summary_loss = self.train_one_epoch(train_loader)
 
-            self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                  ')
-            writer_train.add_scalar('loss', summary_loss.avg, self.epoch+1)
+            self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                                    ')
+            writer_train.add_scalar('A/loss', summary_loss.avg, self.epoch+1)
             self.save(f'{self.base_dir}/last-checkpoint.bin')
 
             t = time.time()
             summary_loss = self.validation(validation_loader)
 
-            self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                   ')
-            writer_val.add_scalar('loss', summary_loss.avg, self.epoch+1)
+            self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                                     ')
+            writer_val.add_scalar('A/loss', summary_loss.avg, self.epoch+1)
 
             if summary_loss.avg < self.best_summary_loss:
                 self.best_summary_loss = summary_loss.avg
@@ -401,15 +406,17 @@ class Fitter:
             if validation_loader.eval_mAP_on_test_sets:
                 # Launch mAP evaluation on the secondary video card
                 mAP, APs = eval_mAP(validation_loader.test_sets, model_path)
-                writer_mAP95_50.add_scalar('AP', mAP, self.epoch+1)
-                writer_mAP95.add_scalar('AP', APs[-1], self.epoch+1)
-                writer_mAP90.add_scalar('AP', APs[-2], self.epoch+1)
-                writer_mAP85.add_scalar('AP', APs[-3], self.epoch+1)
-                writer_mAP80.add_scalar('AP', APs[-4], self.epoch+1)
-                writer_mAP75.add_scalar('AP', APs[-5], self.epoch+1)
+                writer_mAP95_50.add_scalar('A/AP', mAP, self.epoch+1)
+                writer_mAP95.add_scalar('A/AP', APs[-1], self.epoch+1)
+                writer_mAP90.add_scalar('A/AP', APs[-2], self.epoch+1)
+                writer_mAP85.add_scalar('A/AP', APs[-3], self.epoch+1)
+                writer_mAP80.add_scalar('A/AP', APs[-4], self.epoch+1)
+                writer_mAP75.add_scalar('A/AP', APs[-5], self.epoch+1)
 
             if self.config.validation_scheduler:
                 self.scheduler.step(metrics=summary_loss.avg)
+            if self.config.epoch_step_scheduler:
+                self.scheduler.step()
 
             self.epoch += 1
 
@@ -418,14 +425,6 @@ class Fitter:
         summary_loss = AverageMeter()
         t = time.time()
         for step, (images, targets, image_ids, image_paths) in enumerate(val_loader):
-            if self.config.verbose:
-                if step % self.config.verbose_step == 0:
-                    print(
-                        f'Val Step {step}/{len(val_loader)}, ' + \
-                        f'summary_loss: {summary_loss.avg:.5f}, ' + \
-                        f'time: {((time.time() - t)/60.0):.1f} mins ' + \
-                        f'remaining: {(time.time() - t)/(step+1)*(len(val_loader)-step-1)/60:.1f} mins           ', end='\r'
-                    )
             with torch.no_grad():
                 images = torch.stack(images)
                 batch_size = images.shape[0]
@@ -444,6 +443,15 @@ class Fitter:
                 
                 summary_loss.update(loss.detach().item(), batch_size)
 
+            if self.config.verbose:
+                if step % self.config.verbose_step == 0:
+                    print(
+                        f'Val Step {step}/{len(val_loader)}, ' + \
+                        f'summary_loss: {summary_loss.avg:.5f}, ' + \
+                        f'time: {((time.time() - t)/60.0):.1f} mins ' + \
+                        f'remaining: {(time.time() - t)/(step+1)*(len(val_loader)-step-1)/60:.1f} mins           ', end='\r'
+                    )
+
         return summary_loss
 
     def train_one_epoch(self, train_loader):
@@ -451,15 +459,6 @@ class Fitter:
         summary_loss = AverageMeter()
         t = time.time()
         for step, (images, targets, image_ids, image_paths) in enumerate(train_loader):
-            if self.config.verbose:
-                if step % self.config.verbose_step == 0:
-                    print(
-                        f'Train Step {step}/{len(train_loader)}, ' + \
-                        f'summary_loss: {summary_loss.avg:.5f}, ' + \
-                        f'time: {((time.time() - t)/60.0):.1f} mins ' + \
-                        f'remaining: {((time.time() - t)/(step+1)*(len(train_loader)-step-1)/60.0):.1f} mins            ', end='\r'
-                    )
-
             try:
                 images = torch.stack(images)
             except TypeError:
@@ -493,9 +492,27 @@ class Fitter:
             summary_loss.update(loss.detach().item(), batch_size)
 
             self.optimizer.step()
+            self.step += 1
 
             if self.config.step_scheduler:
                 self.scheduler.step()
+                lr = self.optimizer.param_groups[0]['lr']
+                timestamp = datetime.utcnow().isoformat()
+                writer_lr_progress.add_scalar('progress/lr', lr, self.step)
+                if math.isnan(summary_loss.avg):
+                    self.logger.log(f'\nFound NaN in loss...Quit~')
+            lr = self.optimizer.param_groups[0]['lr']
+
+            if self.config.verbose:
+                if step % self.config.verbose_step == 0:
+                    print(
+                        f'Train Step {step}/{len(train_loader)}, ' + \
+                        f'LR {lr:.8f}, ' + \
+                        f'summary_loss: {summary_loss.avg:.5f}, ' + \
+                        f'time: {((time.time() - t)/60.0):.1f} mins ' + \
+                        f'remaining: {((time.time() - t)/(step+1)*(len(train_loader)-step-1)/60.0):.1f} mins                         ', end='\r'
+                    )
+                    writer_train_progress.add_scalar('progress/loss', summary_loss.avg, self.step)
 
         return summary_loss
     
@@ -518,13 +535,14 @@ class Fitter:
         self.epoch = checkpoint['epoch'] + 1
 
 class TrainGlobalConfig:
-    num_workers = 8
-    batch_size = 8
-    n_epochs = 80
-    samples_per_virtual_epoch = 20000
+    num_workers = 4
+    batch_size = 4
+    n_epochs = 4
+    samples_per_virtual_epoch = 10000
     #lr = 0.01
     #lr = 0.001
-    lr = 0.0002
+    lr = 0.001
+    div_factor = 100000
     #lr = 0.00001
     #lr = 0.00003
     # -------------------
@@ -537,19 +555,22 @@ class TrainGlobalConfig:
     # -------------------
 
     # --------------------
-    '''
     step_scheduler = True  # do scheduler.step after optimizer.step
+    epoch_step_scheduler = False  # do scheduler.step train_one_epoch
     validation_scheduler = False  # do scheduler.step after validation stage loss
     SchedulerClass = torch.optim.lr_scheduler.OneCycleLR
     scheduler_params = dict(
-        max_lr=0.0007,
+        max_lr=lr,
         epochs=n_epochs,
-        steps_per_epoch=int(18899 / batch_size),
+        #steps_per_epoch=int(400 / batch_size),
+        steps_per_epoch=int(57528 / batch_size),
         pct_start=0.1,
         anneal_strategy='cos', 
+        div_factor=div_factor,
         final_div_factor=10**5
     )
 
+    '''
     step_scheduler = False  # do scheduler.step after optimizer.step
     validation_scheduler = True  # do scheduler.step after validation stage loss
     SchedulerClass = torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -564,15 +585,16 @@ class TrainGlobalConfig:
         min_lr=lr/32,
         eps=1e-08
     )
-    '''
-    step_scheduler = True  # do scheduler.step after optimizer.step
+    step_scheduler = False  # do scheduler.step after optimizer.step
+    epoch_step_scheduler = True  # do scheduler.step train_one_epoch
     validation_scheduler = False  # do scheduler.step after validation stage loss
     SchedulerClass = torch.optim.lr_scheduler.MultiStepLR
     scheduler_params = dict(
-        milestones=[30,40,50,60,70],
+        milestones=[15,30,40,50,60,70],
         gamma=0.5,
-        verbose=True, 
+        #verbose=False, 
     )
+    '''
 
 def collate_fn(batch):
     return tuple(zip(*batch))
@@ -657,7 +679,7 @@ def run_training(net, output_folder, logger):
     )
     fitter = Fitter(model=net, device=device, config=TrainGlobalConfig, output_folder=output_folder, logger=logger)
     train_loader = SafeDataLoader(train_loader)
-    train_loader = VirtualDataLoader(train_loader, TrainGlobalConfig.samples_per_virtual_epoch // TrainGlobalConfig.batch_size)
+    #train_loader = VirtualDataLoader(train_loader, TrainGlobalConfig.samples_per_virtual_epoch // TrainGlobalConfig.batch_size)
     val_loader = SafeDataLoader(val_loader)
     val_loader.eval_mAP_on_test_sets = TrainGlobalConfig.eval_mAP_on_test_sets
     val_loader.test_sets = TrainGlobalConfig.test_sets
@@ -694,6 +716,7 @@ def build_dataset(names, filters, output_name, logger):
         logger.log("%7d/%7d\t%s" % (len(items), count, name))
     random.shuffle(all_img)
 
+    #all_img = all_img[:400]
     total = len(all_img)
     train_n = int(total * 0.95)
     #train_n = total - 8
@@ -755,12 +778,12 @@ if __name__ == '__main__':
         #"0020_web-collection-003_888_768_768_obb":                          1.0,
         "0020_web-collection-003_1184_768_768_obb":                         1.0,
         #"0021_test_different_resolutions":                                  1.0,
-        "0022_UAV-ROD_dataset":                                              1.0,
+        #"0022_UAV-ROD_dataset":                                              1.0,
         # "0023_VSAI_dataset":                                                 1.0,
-        "0023_VSAI_dataset_2":                                                 1.0,
-        "0024_DroneVehicle_dataset":                                         1.0,
+        #"0023_VSAI_dataset_2":                                                 1.0,
+        #"0024_DroneVehicle_dataset":                                         1.0,
         #"0025_VAID_dataset_aabb":                                            1.0,
-        "0026_VEDAI_dataset":                                                1.0,
+        #"0026_VEDAI_dataset":                                                1.0,
     })
     output_name = 'effdet-d2-drone_'
     model_type = 'tf_efficientdet_d2'
@@ -777,9 +800,11 @@ if __name__ == '__main__':
     dataset_path = build_dataset(datasets, {".jpg", ".jpeg", ".png", ".bmp"}, output_name, logger)
     train_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_train_transforms(), transform2=get_train_transforms2(img_scale), aabb_transform=get_aabb_transforms(), test=False)
     validation_dataset = DatasetRetriever(dataset_path, box_scale, transform=get_valid_transforms(), transform2=get_train_transforms2(img_scale), aabb_transform=get_aabb_transforms(), test=True)
-    logger.log("Batch Size:   %9d" % TrainGlobalConfig.batch_size)
-    logger.log("Learning Rate: %f" % TrainGlobalConfig.lr)
-    logger.log("Num of Epoch:  %d" % TrainGlobalConfig.n_epochs)
+    logger.log("Batch Size:      %9d" % TrainGlobalConfig.batch_size)
+    logger.log("Learning Rate:    %f" % TrainGlobalConfig.lr)
+    logger.log("Div Factor of LR: %.0f" % TrainGlobalConfig.div_factor)
+    logger.log("Num of Epoch:     %d" % TrainGlobalConfig.n_epochs)
+
     logger.log(TrainGlobalConfig.SchedulerClass)
 
     #torch.cuda.empty_cache()
@@ -804,14 +829,14 @@ if __name__ == '__main__':
                 break
         cv2.destroyWindow("image")
 
-    write_folders = ["train", "val", "AP75", "AP80", "AP85", "AP90", "AP95", "AP95_50"]
+    write_folders = ["train_progress", "lr_progress", "train", "val", "AP75", "AP80", "AP85", "AP90", "AP95", "AP95_50"]
     write_folders = [os.path.join(output_path, folder) for folder in write_folders]
     for folder in write_folders:
         if os.path.exists(folder):
             shutil.rmtree(folder)
 
     writers = [SummaryWriter(logdir=folder, flush_secs=10) for folder in write_folders]
-    writer_train, writer_val, writer_mAP75, writer_mAP80, writer_mAP85, writer_mAP90, writer_mAP95, writer_mAP95_50 = writers
+    writer_train_progress, writer_lr_progress, writer_train, writer_val, writer_mAP75, writer_mAP80, writer_mAP85, writer_mAP90, writer_mAP95, writer_mAP95_50 = writers
     net = build_net(model_type, img_scale, num_classes)
     device = torch.device('cuda:0')
     net.to(device)
