@@ -20,7 +20,7 @@ SUMMARY:88.95
 [RESULT]: Val. Epoch: 37, summary_loss: 0.09762, time: 0.8 mins  
 	exactly matched 2021 result ?!
 		just very close in mAP~
-
+88.21_0.37
 -----------------------------------------------------------------------------
 tune batch_size
 
@@ -114,6 +114,7 @@ DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+
 DETAIL:| 99.48% | 99.48% | 99.45% | 99.45% | 99.41% | 99.10% | 98.63% | 96.71% | 82.04% | 18.62% | 89.24% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:89.24
+88.49_0.35
 -----------------------------------------------------------------------------
 # train82 with 4 more dataset except DroneVehicle
 	try to get better mAP
@@ -151,6 +152,7 @@ DETAIL:| 99.50% | 99.50% | 99.50% | 99.46% | 99.32% | 99.16% | 98.48% | 95.77% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:88.52
 	trained to 072epoch
+88.20_0.17
 -----------------------------------------------------------------------------
 # train82 with 1 more dataset UAV-ROD
 # lr=0.0002, min_lr=lr/16, patient=1, max_epoch=80
@@ -202,6 +204,7 @@ DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+
 DETAIL:| 99.52% | 99.52% | 99.52% | 99.52% | 99.49% | 99.26% | 98.65% | 96.33% | 78.74% | 16.50% | 88.70% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:88.70
+88.51_0.23
 -----------------------------------------------------------------------------
 # train82 with 1 more dataset VEDAI
 # lr=0.0002, min_lr=lr/16, patient=1, max_epoch=80
@@ -230,6 +233,7 @@ DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+
 DETAIL:| 99.38% | 99.38% | 99.38% | 99.38% | 99.31% | 99.16% | 98.64% | 96.22% | 79.58% | 16.10% | 88.65% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:88.65
+88.33_0.10
 -----------------------------------------------------------------------------
 # train82 with 4 new datasets except VAID_aabb
 # lr=0.0002, min_lr=lr/16, patient=1, max_epoch=60
@@ -262,6 +266,7 @@ DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+
 DETAIL:| 99.57% | 99.57% | 99.57% | 99.57% | 99.45% | 99.23% | 98.73% | 96.81% | 81.55% | 18.29% | 89.23% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:89.23
+88.93_0.17
 -----------------------------------------------------------------------------
 # train82 with 5 new datasets including VAID_aabb
 # lr=0.0002, min_lr=lr/16, patient=1, max_epoch=60
@@ -313,6 +318,7 @@ DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+
 DETAIL:| 99.48% | 99.48% | 99.48% | 99.48% | 99.41% | 99.16% | 98.69% | 96.75% | 80.99% | 16.44% | 88.94% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:88.94
+89.11_0.13
 -----------------------------------------------------------------------------
 # train82 with 4 new datasets except VAID_aabb
 # lr=0.0002, min_lr=lr/32, patient=1, max_epoch=80
@@ -354,10 +360,21 @@ DETAIL:| 99.55% | 99.55% | 99.55% | 99.52% | 99.45% | 99.18% | 98.68% | 96.36% |
 DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 SUMMARY:88.68
 
+LR: 6.25e-06
+[RESULT]: Train. Epoch: 55, summary_loss: 0.09078, time: 16.1 mins                           
+[RESULT]: Val. Epoch: 55, summary_loss: 0.10961, time: 0.9 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0010_with_4_new_datasets_except_VAID_aabb_rotaug0.9_bs8_lr2e-4_2w_samples_per_virtual_epoch_train0.95_seed167/best-checkpoint-055epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.52% | 99.52% | 99.52% | 99.48% | 99.45% | 99.11% | 98.63% | 95.91% | 79.27% | 16.00% | 88.64% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.64
+	stop early due to inadequate lr schedule
 lr reduced too fast due to strong rot aug
 	only apply on trainning set but not on val set
 		use fix lr schedule?
-
+88.39_0.12
 -----------------------------------------------------------------------------
 # train82 with 4 new datasets except VAID_aabb
 # lr=0.0002, min_lr=lr/32, patient=1, max_epoch=80
@@ -366,9 +383,184 @@ lr reduced too fast due to strong rot aug
 cp trainz0011.py train2.py
 python train2.py z0011_with_5_new_datasets_except_VAID_aabb_rotaug0.9_lr30-40-50-60-70_bs8_lr2e-4_2w_samples_per_virtual_epoch_train0.95_seed167 167
 
-todo: change notes and folder name
+LR: 1.25e-05
+[RESULT]: Train. Epoch: 62, summary_loss: 0.08288, time: 16.1 mins                          
+[RESULT]: Val. Epoch: 62, summary_loss: 0.10163, time: 0.9 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0011_with_5_new_datasets_except_VAID_aabb_rotaug0.9_lr30-40-50-60-70_bs8_lr2e-4_2w_samples_per_virtual_epoch_train0.95_seed167/best-checkpoint-062epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.48% | 99.48% | 99.48% | 99.44% | 99.41% | 99.22% | 98.69% | 96.39% | 79.72% | 18.15% | 88.95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.95
+
+LR: 6.25e-06
+[RESULT]: Train. Epoch: 79, summary_loss: 0.08140, time: 16.1 mins                          
+[RESULT]: Val. Epoch: 79, summary_loss: 0.09996, time: 0.9 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0011_with_5_new_datasets_except_VAID_aabb_rotaug0.9_lr30-40-50-60-70_bs8_lr2e-4_2w_samples_per_virtual_epoch_train0.95_seed167/best-checkpoint-079epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.44% | 99.44% | 99.44% | 99.40% | 99.37% | 99.18% | 98.60% | 96.05% | 78.96% | 16.93% | 88.68% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.68
+
+avg of last 10 mAP95_50, absdev: 88.75_0.09
+-----------------------------------------------------------------------------
+# # train82 with 4 new datasets except VAID_aabb
+# # lr=0.0004, min_lr=lr/32, patient=1, max_epoch=80
+# # batch_size = 8, 80 virtual epochs with every 2w samples, 90% rot_aug
+# # multistep_lr_schedule = [15,30,40,50,60,70]
+# cp trainz0012.py train2.py
+# python train2.py z0012_with_4_new_datasets_except_VAID_aabb_rotaug0.9_lr15-30-40-50-60-70_bs8_lr2e-4_2w_samples_per_virtual_epoch_train0.95_seed167 167
+#skipped
 
 -----------------------------------------------------------------------------
+# train82 with 5 new datasets
+# lr=0.0004, min_lr=lr/32, patient=1, max_epoch=80
+# batch_size = 8, 80 virtual epochs with every 2w samples
+# multistep_lr_schedule = [15,30,40,50,60,70]
+cp trainz0014.py train2.py
+python train2.py z0014_with_5_new_datasets_lr15-30-40-50-60-70_bs8_lr4e-4_2w_samples_per_virtual_epoch_train0.95_seed167 167
+
+LR: 2.5e-05
+[RESULT]: Train. Epoch: 54, summary_loss: 0.10040, time: 16.2 mins                          
+[RESULT]: Val. Epoch: 54, summary_loss: 0.10270, time: 1.0 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0014_with_5_new_datasets_lr15-30-40-50-60-70_bs8_lr4e-4_2w_samples_per_virtual_epoch_train0.95_seed167/best-checkpoint-054epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.58% | 99.58% | 99.58% | 99.58% | 99.48% | 99.09% | 98.83% | 95.95% | 79.91% | 17.36% | 88.90% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.90
+
+LR: 6.25e-06
+[RESULT]: Train. Epoch: 79, summary_loss: 0.09785, time: 16.1 mins                          
+[RESULT]: Val. Epoch: 79, summary_loss: 0.10082, time: 1.0 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0014_with_5_new_datasets_lr15-30-40-50-60-70_bs8_lr4e-4_2w_samples_per_virtual_epoch_train0.95_seed167/best-checkpoint-079epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.55% | 99.55% | 99.55% | 99.52% | 99.37% | 99.13% | 98.65% | 96.00% | 78.36% | 15.57% | 88.53% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.53
+88.54_0.10
+	not as good as expected
+	get a little bit overfit @ 31th epoch
+-----------------------------------------------------------------------------
+train a little bit longer
+
+# train82 with 5 new datasets
+# lr=0.0004, min_lr=lr/32, max_epoch=105
+# batch_size = 8, 105 virtual epochs with every 2w samples
+# multistep_lr_schedule = [15,30,45,60,75,90]
+cp trainz0016.py train2.py
+python train2.py z0016_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_2w_samples_105_epochs_train0.95_seed167 167
+
+LR: 5e-05
+[RESULT]: Train. Epoch: 52, summary_loss: 0.10170, time: 16.1 mins                          
+[RESULT]: Val. Epoch: 52, summary_loss: 0.10335, time: 1.0 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0016_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_2w_samples_105_epochs_train0.95_seed167/best-checkpoint-052epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.52% | 99.52% | 99.52% | 99.48% | 99.37% | 99.23% | 98.83% | 96.94% | 80.99% | 17.10% | 89.05% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:89.05
+
+LR: 6.25e-06
+[RESULT]: Train. Epoch: 103, summary_loss: 0.09505, time: 16.1 mins                          
+[RESULT]: Val. Epoch: 103, summary_loss: 0.09786, time: 1.0 mins                      
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/z0016_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_2w_samples_105_epochs_train0.95_seed167/best-checkpoint-103epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.52% | 99.52% | 99.52% | 99.49% | 99.34% | 99.22% | 98.81% | 96.74% | 80.85% | 14.83% | 88.78% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.78
+88.67_0.14
+z0014_with_5_new_datasets_lr15-30-40-50-60-70_bs8_lr4e-4_2w_samples_per_virtual_epoch_train0.95_seed167
+	vs z0016_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_2w_samples_105_epochs_train0.95_seed167
+		88.54_0.10 vs 88.67_0.14
+			doesn't help loss or AABB mAPs when training a little bit longer (10 epoch a step => 15 epoch a step) for bs8_lr4e-4_2w 
+-----------------------------------------------------------------------------
+train even longer
+
+# train with 5 new datasets
+# lr=0.0004, min_lr=lr/32, max_epoch=105
+# batch_size = 8, 105 virtual epochs with every 4w samples
+# multistep_lr_schedule = [15,30,45,60,75,90]
+cp trainzb0017.py train2.py
+python train2.py zb0017_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_4w_samples_105_epochs_train0.95_seed167 167
+
+LR: 1.25e-05
+[RESULT]: Train. Epoch: 87, summary_loss: 0.08612, time: 32.1 mins                           
+[RESULT]: Val. Epoch: 87, summary_loss: 0.09073, time: 1.0 mins                       
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/zb0017_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_4w_samples_105_epochs_train0.95_seed167/best-checkpoint-087epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.48% | 99.48% | 99.48% | 99.44% | 99.36% | 99.19% | 98.89% | 96.44% | 78.31% | 15.86% | 88.59% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:88.59
+
+LR: 6.25e-06
+[RESULT]: Train. Epoch: 104, summary_loss: 0.08513, time: 32.2 mins                          
+[RESULT]: Val. Epoch: 104, summary_loss: 0.09060, time: 1.0 mins                      
+/home/me/1TSSD/maliang/efficientdet_pytorch/_models/zb0017_with_5_new_datasets_lr15-30-45-60-75-90_bs8_lr4e-4_4w_samples_105_epochs_train0.95_seed167/best-checkpoint-104epoch.bin
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:|   50%  |   55%  |   60%  |   65%  |   70%  |   75%  |   80%  |   85%  |   90%  |   95%  | 50-95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+DETAIL:| 99.48% | 99.48% | 99.48% | 99.48% | 99.29% | 99.18% | 98.72% | 95.91% | 74.90% | 13.62% | 87.95% |
+DETAIL:+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+SUMMARY:87.95
+88.21_0.14
+	just lower loss and a little more overfitting
+		but not more progress on mAP improvement...
+
+class TrainGlobalConfig:
+    num_workers = 4
+    batch_size = 4
+    n_epochs = 1
+    samples_per_virtual_epoch = 10000
+    #lr = 0.01
+    #lr = 0.001
+    lr = 0.0056
+    div_factor = 25
+    #lr = 0.00001
+    #lr = 0.00003
+-----------------------------------------------------------------------------
+lr_finder
+            # Forward pass
+            if 0:
+                inputs = self.model(inputs)
+                loss = self.criterion(outputs, labels)
+            else:
+                images = inputs
+                targets = labels
+                images = torch.stack(images)
+                #print([type(v) for v in images])
+                #print(labels)
+                #print(labels.shape)
+                #exit()
+                images = images.to(self.device).float() / 255.0
+                batch_size = images.shape[0]
+                boxes = [target['boxes'].to(self.device).float() for target in targets]
+                labels = [target['labels'].to(self.device).float() for target in targets]
+
+                target_res = {}
+                target_res['bbox'] = boxes
+                target_res['cls'] = labels
+                target_res["img_scale"] = torch.tensor([1.0] * batch_size, dtype=torch.float).to(self.device)
+                target_res["img_size"] = torch.tensor([images[0].shape[-2:]] * batch_size, dtype=torch.float).to(self.device)
+                outputs = self.model(images, target_res)
+                loss = outputs['loss']
+
+
+
+train without 5 new datasets?
+5k,1w,2w,4w samples/epoch
+
 
 todo more history log check
 	to_back/aaaz.zip

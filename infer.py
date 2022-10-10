@@ -22,6 +22,8 @@ from .effdet.efficientdet import HeadNet
 import warnings
 warnings.simplefilter("ignore")
 
+image_type_filters = ("png", "jpg", "jpeg", "bmp", "tif", "tiff")
+
 def get_valid_transforms(image_scale):
     return A.Compose([
             #A.CLAHE(p=1.0),
@@ -428,7 +430,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None, want_obb=False
             os.mkdir(output_base_path)
         for item in os.listdir(path):
             ext = item[item.rfind(".")+1:]
-            if ext.lower() in ("png", "jpg", "jpeg", "bmp"):
+            if ext.lower() in image_type_filters:
                 print(item)
                 img_path = os.path.join(path, item)
                 output_path = os.path.join(output_base_path, item)
@@ -532,7 +534,7 @@ def run(path, angles, common_vehicle_width=None, model_path=None, want_obb=False
         return
  
     ext = path[path.rfind(".")+1:]
-    if ext.lower() in ("png", "jpg", "jpeg", "bmp"):
+    if ext.lower() in image_type_filters:
         start = time.time()
         json_path = path[0:path.rfind(".")]+".vehicles.json" if config.save_result else None
         for angle in angles:
