@@ -385,14 +385,14 @@ class Fitter:
             t = time.time()
             summary_loss = self.train_one_epoch(train_loader)
 
-            self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                                    ')
+            self.logger.log(f'[RESULT]: Train. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins {" "*60}')
             writer_train.add_scalar('A/loss', summary_loss.avg, self.epoch+1)
             self.save(f'{self.base_dir}/last-checkpoint.bin')
 
             t = time.time()
             summary_loss = self.validation(validation_loader)
 
-            self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins                                     ')
+            self.logger.log(f'[RESULT]: Val. Epoch: {self.epoch}, summary_loss: {summary_loss.avg:.5f}, time: {((time.time() - t)/60.0):.1f} mins {" "*60}')
             writer_val.add_scalar('A/loss', summary_loss.avg, self.epoch+1)
 
             if summary_loss.avg < self.best_summary_loss:
@@ -489,7 +489,8 @@ class Fitter:
             
             loss.backward()
 
-            summary_loss.update(loss.detach().item(), batch_size)
+            batch_loss = loss.detach().item() / batch_size
+            summary_loss.update(batch_loss, batch_size)
 
             self.optimizer.step()
             self.step += 1
@@ -499,7 +500,7 @@ class Fitter:
                 lr = self.optimizer.param_groups[0]['lr']
                 timestamp = datetime.utcnow().isoformat()
                 writer_lr_progress.add_scalar('progress/lr', lr, self.step)
-                if math.isnan(summary_loss.avg):
+                if math.isnan(summary_loss.avg) or math.isnan(batch_loss):
                     self.logger.log(f'\nFound NaN in loss...Quit~')
             lr = self.optimizer.param_groups[0]['lr']
 
@@ -509,10 +510,11 @@ class Fitter:
                         f'Train Step {step}/{len(train_loader)}, ' + \
                         f'LR {lr:.8f}, ' + \
                         f'summary_loss: {summary_loss.avg:.5f}, ' + \
+                        f'batch_loss: {batch_loss:.5f}, ' + \
                         f'time: {((time.time() - t)/60.0):.1f} mins ' + \
                         f'remaining: {((time.time() - t)/(step+1)*(len(train_loader)-step-1)/60.0):.1f} mins                         ', end='\r'
                     )
-                    writer_train_progress.add_scalar('progress/loss', summary_loss.avg, self.step)
+                    writer_train_progress.add_scalar('progress/loss', batch_loss, self.step)
 
         return summary_loss
     
@@ -541,8 +543,8 @@ class TrainGlobalConfig:
     samples_per_virtual_epoch = 10000
     #lr = 0.01
     #lr = 0.001
-    lr = 0.001
-    div_factor = 100000
+    lr = 0.0056
+    div_factor = 25
     #lr = 0.00001
     #lr = 0.00003
     # -------------------
