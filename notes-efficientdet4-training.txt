@@ -564,8 +564,92 @@ private170_det(model-073-036epoch）private170_det(model-092-035epoch)：	matche
 		073在mIoU上比092高0.5%
 
 
+
+datasets@2021 (60556)
+   5000	0009_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb
+   5000	0010_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb
+    250	0011_dataset_20200901M2_20200907_1202_200m_fixed_768_768_obb_bus
+    250	0012_dataset_20200901M2_20200907_1202_200m_fixed_1536_768_obb_bus
+   3124	0013_dataset_tongji_011_768_768_obb
+   5000	0014_dataset_20200901M2_20200903_1205_250m_fixed_768_768_obb
+   5000	0015_dataset_20200901M2_20200907_1104_200m_fixed_768_768_obb
+   4940	0016_dataset_ysq1_768_768_obb
+   4940	0017_dataset_ysq1_1440_768_obb
+   8000	0018_syq4_dataset_768_768_obb_bus
+   8000	0019_gm7_dataset_768_768_obb_bus
+  11052	0020_web-collection-003_1184_768_768_obb
+
+datasets@2022 (24343)
+   1604	0022_UAV-ROD_dataset
+    688	0023_VSAI_dataset_2
+   9708	0024_DroneVehicle_dataset
+  10420	0025_VAID_dataset_aabb
+   1923	0026_VEDAI_dataset
+
+model:
+	073	datasets@2021
+	092	datasets@2021 + VSAI
+	z0009	datasets@2021 + datasets@2022
+
+2022 new datasets:
+	UAV-ROD 073\UAV-ROD_det:		precision[30077], mIoU:[83.9647%]	recall[30090], mIoU:[82.0598%]
+	UAV-ROD 092\UAV-ROD_det:		precision[30131], mIoU:[82.9722%]	recall[30090], mIoU:[81.8014%]
+	UAV-ROD z0009\UAV-ROD_det:		precision[30904], mIoU:[86.3341%]	recall[30090], mIoU:[87.8478%]
+
+	VSAI 073\VSAI_det:			precision[6217], mIoU:[76.4009%]	recall[6003], mIoU:[77.3474%]
+	VSAI 092\VSAI_det:			precision[6923], mIoU:[68.4470%]	recall[6003], mIoU:[77.6353%]
+	VSAI z0009\VSAI_det:			precision[6795], mIoU:[73.0256%]	recall[6003], mIoU:[80.9056%]
+
+	VEDAI 092\VEDAI_det:			precision[4435], mIoU:[48.2377%]	recall[3531], mIoU:[60.4371%]
+	VEDAI 073\VEDAI_det:			precision[4294], mIoU:[50.4403%]	recall[3531], mIoU:[59.7909%]
+	VEDAI z0009\VEDAI_det:			precision[4827], mIoU:[51.9929%]	recall[3531], mIoU:[70.0584%]
+
+	DroneVehicle 073\DroneVehicle_det:	precision[133915], mIoU:[76.3641%]	recall[134760], mIoU:[74.3243%]
+	DroneVehicle 092\DroneVehicle_det:	precision[139897], mIoU:[70.5376%]	recall[134760], mIoU:[71.9775%]
+	DroneVehicle z0009\DroneVehicle_det:	precision[141787], mIoU:[73.9678%]	recall[134760], mIoU:[76.5296%]
+
+	073\linz_det 092\linz_det:		matched[073\linz_det]:[1829], mIoU:[78.8845%]
+	073\linz_det z0009\linz_det:		matched[073\linz_det]:[1820], mIoU:[76.5484%]
+	092\linz_det 073\linz_det:		matched[092\linz_det]:[1723], mIoU:[83.8404%]
+	092\linz_det z0009\linz_det:		matched[092\linz_det]:[1820], mIoU:[80.0330%]
+	z0009\linz_det 073\linz_det:		matched[z0009\linz_det]:[1723], mIoU:[80.9771%]
+	z0009\linz_det 092\linz_det:		matched[z0009\linz_det]:[1829], mIoU:[79.5060%]
+
+python compute_mIoU.py _relabeled\073\UAV-ROD_det UAV-ROD
+python compute_mIoU.py _relabeled\092\UAV-ROD_det UAV-ROD
+python compute_mIoU.py _relabeled\z0009\UAV-ROD_det UAV-ROD
+
+python compute_mIoU.py _relabeled\073\VSAI_det VSAI
+python compute_mIoU.py _relabeled\092\VSAI_det VSAI
+python compute_mIoU.py _relabeled\z0009\VSAI_det VSAI
+
+python compute_mIoU.py _relabeled\073\VEDAI_det VEDAI
+python compute_mIoU.py _relabeled\092\VEDAI_det VEDAI
+python compute_mIoU.py _relabeled\z0009\VEDAI_det VEDAI
+
+
 进一步分析长宽分布和差异，统计漏检与误检
 	参看fiftyone的效果
+
+合并多次检测与gt的标注结果
+	中低置信度或不确定性差的检测结果不用
+	图像边缘以及有相互交叠的检测框不用
+	所有可用检测框
+		求交集，再求最小OBB
+		Weighted-Boxes-Fusion?
+		仅利用宽度
+		重新做显著性物体分割?
+2022 - OBBStacking - An Ensemble Method for Remote Sensing Object Detection
+2020 - Ensemble Methods for Object Detection
+2018 - Salience Biased Loss for Object Detection in Aerial Images
+2018 - Three Birds One Stone - A General Architecture for Salient Object Segmentation, Edge Detection and Skeleton Extraction
+2022 - Salient Object Detection via Bounding-box Supervision
+2022 - Ensemble Learning techniques for object detection in high-resolution satellite images
+	Snapshot Ensembling methods
+	Stochastic Weight Averaging (SWA)
+	Tested ensembling techniques
+2021 - Multiscale Object Detection from Drone Imagery Using Ensemble Transfer Learning
+2022 - Enhancing object detection in aerial images
 
 
 https://github.com/ildoonet/pytorch-gradual-warmup-lr
@@ -709,9 +793,39 @@ lr0.06=>0.06/100000 14epochs:
 lr0.056=>0.0056/25 1epoch:	85.92%
 lr0.056=>0.0056/25 4epochs:	87.12%
 lr0.056=>0.0056/25 8epoch:	87.54%
-lr0.056=>0.0056/25 12epoch:	
+lr0.056=>0.0056/25 12epoch:	87.93%
+lr0.056=>0.0056/25 16epoch:	88.18%
+lr0.056=>0.0056/25 20epoch:
+lr0.056=>0.0056/25 24epoch:
+lr0.056=>0.0056/25 28epoch:
+lr0.056=>0.0056/25 32epoch:
+lr0.056=>0.0056/25 36epoch:
+lr0.056=>0.0056/25 40epoch:
+lr0.056=>0.0056/25 80epoch:
+
+batch size 8
+	lr0.01=>0.01/25 8epoch:		
+	lr0.009=>0.009/25 8epoch:	
+	lr0.008=>0.008/25 8epoch:	
+	lr0.007=>0.007/25 8epoch:	
+	lr0.006=>0.006/25 8epoch:	
+	lr0.0056=>0.0056/25 8epoch:	
 
 https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.OneCycleLR.html
+
+try OnCycleLR with AdamW?
+	https://www.fast.ai/posts/2018-07-02-adam-weight-decay.html
+	https://github.com/sgugger/Adam-experiments
+	https://www.jeremyjordan.me/nn-learning-rate/
+		next try
+
+efficientdet finetuning hyperparameter?
+	any experience on web?
+
+efficientdet v2 readme and example
+	https://medium.com/data-science-at-microsoft/training-efficientdet-on-custom-data-with-pytorch-lightning-using-an-efficientnetv2-backbone-1cdf3bd7921f
+	https://gist.github.com/Chris-hughes10/73628b1d8d6fc7d359b3dcbbbb8869d7
+		to read
 
 
 使用不同的总训练长度 1epoch vs 14 epochs，前10%的sample用于lr上升的情况下
@@ -720,15 +834,36 @@ https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.OneCycleLR.ht
 			总之预热的不同程度后能使用的最大lr不一样
 	1 epoch:   0.0056 (div_factor=25)
 	14 epochs: 0.6 (div_factor=100000)
-		todo：改好tensorboard，看lr/loss/mAP走势图
 
+tensorboard，看lr/loss/mAP走势图
+	修改为batch loss，（并做指数平滑? 暂时不做）
 
+对train/val set中的sample使用loss排序
+	再剔除部分loss过高的过难sample?
 
 
 efficientdet-pytorch/train.py
 	try this?
 
 efficientdet-pytorch some weight frozen? weight decay changed? wheat detection original code?
+	optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
+	https://www.kaggle.com/code/shonenkov/training-efficientdet/comments
+Thanks for this great kernel. I have a question. Why are the following codes never be used:
+        param_optimizer = list(self.model.named_parameters())
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
+            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ] 
+The model is a global variable, so these lines change the setting of model.
+	??? how ?
+my rely:
+I don't think so. The code doesn't modify anything of the self.model.
+The first param of AdamW is parameters or parameter groups (https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html)
+I think the code is somehow unused. To use them, you have to pass the optimizer_grouped_parameters to the AdamW optimizer. Something like this: 
+`optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)`
+	for example
+		https://discuss.pytorch.org/t/custom-optimizer/134311
 
 
 
