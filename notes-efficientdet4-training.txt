@@ -632,22 +632,57 @@ python compute_mIoU.py _relabeled\z0009\VEDAI_det VEDAI
 	参看fiftyone的效果
 
 合并多次检测与gt的标注结果
-	中低置信度或不确定性差的检测结果不用
+	中低置信度或不确定性差的检测结果不用 (DONE)
 	图像边缘以及有相互交叠的检测框不用
 	所有可用检测框
-		求交集，再求最小OBB
+		求交集，再求最小OBB (DONE)
 		Weighted-Boxes-Fusion?
 		仅利用宽度
 		重新做显著性物体分割?
+
+合并多次标注或识别结果，并在cytrafficeditor中显示
+	python concat_vehicle_markers.py det_gt_073_092_z0009 VAID det_073 det_092 det_z0009
+利用aabb标注找到正确的obb识别结果后求交集在计算最小面积矩形
+	python fuse_obb.py VAID_obb VAID _relabeled\073\VAID_det_073 _relabeled\092\VAID_det_092 _relabeled\z0009\VAID_det_z0009
+		即使进行了根据confidence和uncertainty进行了剔除
+			还是需要人工再进行筛选或修改，但因为大部分框质量尚可，处理速度可以提高不少
+
+使用网络判断车辆是否完整
+使用网络回归车辆朝向
+
+
+2022 - Decentralized Vehicle Coordination - The Berkeley DeepDrive Drone Dataset
+	Detectron2 RetinaNet pretrained model
+
+
 2022 - OBBStacking - An Ensemble Method for Remote Sensing Object Detection
+	Calibration of the neural networks
 2020 - Ensemble Methods for Object Detection
 2018 - Salience Biased Loss for Object Detection in Aerial Images
 2018 - Three Birds One Stone - A General Architecture for Salient Object Segmentation, Edge Detection and Skeleton Extraction
 2022 - Salient Object Detection via Bounding-box Supervision
 2022 - Ensemble Learning techniques for object detection in high-resolution satellite images
+	Bagging, or bootstrap aggregating
+		random sub-samples
+	boosting
+		samples the original dataset in order to correct the errors of the previous models iteratively
+	synthetic bagging
+		models are then trained on the same dataset with different kinds of augmentations
+
 	Snapshot Ensembling methods
+		cyclical scheduling
+	Fast Geometric Ensembling
+		rapidly cycling linear piecewise variations of the learning rate
 	Stochastic Weight Averaging (SWA)
-	Tested ensembling techniques
+	Hydra
+		fined-tuned by applying various data augmentations.
+	Voting-based methods
+	Test Time Augmentation
+	Stacked generalization
+		meta-learner
+	Dropout as a Bayesian Approximation
+		dropout in prediction stage and average results
+
 2021 - Multiscale Object Detection from Drone Imagery Using Ensemble Transfer Learning
 2022 - Enhancing object detection in aerial images
 
@@ -804,12 +839,17 @@ lr0.056=>0.0056/25 40epoch:
 lr0.056=>0.0056/25 80epoch:
 
 batch size 8
-	lr0.01=>0.01/25 8epoch:		
-	lr0.009=>0.009/25 8epoch:	
-	lr0.008=>0.008/25 8epoch:	
-	lr0.007=>0.007/25 8epoch:	
-	lr0.006=>0.006/25 8epoch:	
-	lr0.0056=>0.0056/25 8epoch:	
+	lr0.03=>0.03/25 32epoch:	 %	train loss:  , val loss:  
+	lr0.05=>0.05/25 8epoch:		  NaN%	train loss:     NaN, val loss:     NaN
+	lr0.04=>0.04/25 8epoch:		88.14%	train loss: 0.01200, val loss: 0.09322
+	lr0.03=>0.03/25 8epoch:		88.29%	train loss: 0.01228, val loss: 0.09533
+	lr0.02=>0.02/25 8epoch:		88.18%	train loss: 0.01282, val loss: 0.09911
+	lr0.01=>0.01/25 8epoch:		87.94%	train loss: 0.01400, val loss: 0.10700
+	lr0.009=>0.009/25 8epoch:	87.91%	train loss: 0.01418, val loss: 0.10830
+	lr0.008=>0.008/25 8epoch:	87.84%	train loss: 0.01439, val loss: 0.10988
+	lr0.007=>0.007/25 8epoch:	87.75%	train loss: 0.01464, val loss: 0.11167
+	lr0.006=>0.006/25 8epoch:	87.67%  train loss: 0.01494, val loss: 0.11388
+
 
 https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.OneCycleLR.html
 
