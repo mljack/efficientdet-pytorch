@@ -14,23 +14,26 @@ class Obj:
     def __init__(self, obj_json):
         self.json = obj_json
         pts = obb_to_pts(obj_json)
-        self.poly = Polygon(pts)
-        self.radius = dist(pts[0], pts[2]) * 0.5
         self.p = ((pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) * 0.25,
             (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) * 0.25)
+        self.poly = Polygon(pts)
+        pts = pts_to_aabb_pts(pts)
+        self.poly_aabb = Polygon(pts)
+        self.radius = dist(pts[0], pts[2]) * 0.5
         self.match_count = 0
         self.dets = []
-            
+        self.IoU = 0.0
+
 def IoU_obb(obj1, obj2):
     dx = abs(obj1.p[0] - obj2.p[0])
     dy = abs(obj1.p[1] - obj2.p[1])
     radius = obj1.radius + obj2.radius
     if dx > radius or dy > radius:
         return 0.0
-    intersection_area = obj1.poly.intersection(obj2.poly).area
+    intersection_area = obj1.poly_aabb.intersection(obj2.poly_aabb).area
     if intersection_area == 0.0:
         return 0.0
-    return intersection_area / obj1.poly.union(obj2.poly).area
+    return intersection_area / obj1.poly_aabb.union(obj2.poly_aabb).area
 
 def compute_max_IoU_obj(obj_a, objs, func):
     max_IoU = 0.0
@@ -44,6 +47,15 @@ def compute_max_IoU_obj(obj_a, objs, func):
             max_IoU_obj = obj_b
     #print(max_IoU)
     return max_IoU_obj, max_IoU
+
+def find_most_prob_obb(dets):
+    max_IoU = 0.0
+    max_IoU_det = None
+    for det in dets:
+        if det.IoU > max_IoU:
+            max_IoU = det.IoU
+            max_IoU_det = det
+    return max_IoU_det
 
 def load_vehicle_markers(path):
     with open(path) as f:
@@ -64,12 +76,22 @@ def obb_to_pts(obb):
         c + 0.5*length*dir - 0.5*width*normal,
     ])
 
+def pts_to_aabb_pts(pts):
+    x_min, y_min = np.min(pts, axis=0)
+    x_max, y_max = np.max(pts, axis=0)
+    return np.array([
+        (x_min, y_min),
+        (x_min, y_max),
+        (x_max, y_max),
+        (x_max, y_min),
+    ])
+
 def fuse_dets(dets):
     result = None
     for det in dets:
-        certainty = det.json["certainty"]
+        certainty = det.json["certainty"] if "certainty" in det.json else -1.0
         score = det.json["score"]
-        if certainty > 0.75 and score > 0.5:
+        if (certainty > 0.75 and score > 0.5) or (certainty == -1 and score > 0.7):
             if result is None:
                 result = det.poly
             else:
@@ -117,9 +139,11 @@ def run(dst_folder, filename, base_paths):
         if gt_objs is None:
             gt_objs = objs
         else:
+            # Test AABB IoU with AABB groundtruth labels
             for gt_obj in gt_objs:
                 max_IoU_obj, max_IoU = compute_max_IoU_obj(gt_obj, objs, IoU_obb)
-                if max_IoU > 0.1:
+                if max_IoU > 0.3:
+                    max_IoU_obj.IoU = max_IoU
                     gt_obj.dets.append(max_IoU_obj)
 
     new_gt_objs = []
@@ -128,18 +152,29 @@ def run(dst_folder, filename, base_paths):
         poly = fuse_dets(gt_obj.dets)
         count += 1
         if poly is not None and not poly.is_empty:
-            new_gt_objs.append(build_vehicle_marker(count, poly))
+            # Intersection of all confident detection results
+            new_gt_objs.append(build_vehicle_marker(count, poly))   # in red
         else:
-            gt_obj.json["id"] = count
-            gt_obj.json["certainty"] = 0.5
-            new_gt_objs.append([gt_obj.json])
+            # Fallback to detection results with max IoU
+            det = find_most_prob_obb(gt_obj.dets)
+            if det is not None:
+                det_json = det.json.copy()
+                det_json["id"] = count
+                det_json["certainty"] = 1.0
+                det_json["score"] = 0.6             # in green
+                new_gt_objs.append([det_json])
+            else:
+                # Fallback to AABB groundtruth
+                gt_obj.json["id"] = count
+                gt_obj.json["certainty"] = 0.5      # highlighted
+                new_gt_objs.append([gt_obj.json])
+        # Add all matched result in the hidden state.
         for obj_det in gt_obj.dets:
             count += 1
             obj_det.json["id"] = count
             obj_det.json["enabled"] = False
             new_gt_objs.append([obj_det.json])
     
-
     with open(dst_json_path, "w") as f:
         f.write(pprint.pformat(new_gt_objs, width=500, indent=1).replace("'", "\"").replace("True", "true").replace("False", "false"))
 
@@ -155,6 +190,7 @@ if __name__ == "__main__":
 
     filenames = [item for item in os.listdir(base_paths[0]) if item.endswith(".vehicle_markers.json")]
     for filename in filenames:
+        #if filename == "003334.vehicle_markers.json":
         run(dst_folder, filename, base_paths)
 
 

@@ -646,9 +646,20 @@ python compute_mIoU.py _relabeled\z0009\VEDAI_det VEDAI
 	python fuse_obb.py VAID_obb VAID _relabeled\073\VAID_det_073 _relabeled\092\VAID_det_092 _relabeled\z0009\VAID_det_z0009
 		即使进行了根据confidence和uncertainty进行了剔除
 			还是需要人工再进行筛选或修改，但因为大部分框质量尚可，处理速度可以提高不少
+(pytorch2022) F:\ws\YOLOv5_DOTA_OBB>
+F:\ws\YOLOv5_DOTA_OBB\utils\datasets.py
+	scale_ratio = 1.0
+	img00 = np.zeros((640, 1137, 3), np.uint8)
+python detect.py --img-size 1137 --source F:\ws\CyTrafficEditor2\Source\CyTrafficEditor\CyTraffic\data\videos\VAID --weights runs\_exp8\YOLOv5_DOTA_OBB_exp8_last.pt --obj-path F:\det_yolov5_obb --device 0 --view-img 1 --save-json 1
+python fuse_obb.py VAID_det_gt_073_092_z0009_yolov5_obb VAID _relabeled\073\VAID_det_073 _relabeled\092\VAID_det_092 _relabeled\yolov5_obb\VAID_det_yolov5_obb
+	使用之前 YOLOv5_DOTA_OBB 训练的模型检测，结果也是比较精准的，再使用 fuse_obb.py 合并多次识别结果
+		模型识别结果都不置信时，选用AABB IoU与标注label最大的结果做为合并结果，并标记为绿色
+			连一个AABB IoU > 0.3的结果都没有的话，就用原始AABB groundtruth结果，并标记为亮蓝色
+
 
 使用网络判断车辆是否完整
 使用网络回归车辆朝向
+按照loss排序筛选训练集合中的 hard sample
 
 
 2022 - Decentralized Vehicle Coordination - The Berkeley DeepDrive Drone Dataset
@@ -725,8 +736,16 @@ https://forums.fast.ai/t/is-learning-rate-finder-works-for-adam/7976
 					@ 2018-07-02
 					1cycle policy + AdamW
 						so lr_finder is used?
+					Adam generally requires more regularization than SGD, so be sure to adjust
+						your regularization hyper-parameters when switching from SGD to Adam.
+To do this, we found the optimal value for beta2 when using a 1cycle policy was 0.99. We treated the beta1 parameter as the momentum in SGD (meaning it goes from 0.95 to 0.85 as the learning rates grow, then goes back to 0.95 when the learning rates get lower).
 
-
+https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
+https://pytorch.org/docs/stable/generated/torch.optim.Adam.html
+https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html
+https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.OneCycleLR.html
+	cycle_momentum=True, base_momentum=0.85, max_momentum=0.95
+		TODO: check 1cycle polcy momentum settings
 
 最大lr选择
 	lr_finder图中，loss下降最快处的lr，还是loss上升前的最大lr?
@@ -839,7 +858,8 @@ lr0.056=>0.0056/25 40epoch:
 lr0.056=>0.0056/25 80epoch:
 
 batch size 8
-	lr0.03=>0.03/25 32epoch:	 %	train loss:  , val loss:  
+	lr0.01=>0.01/25 32epoch:
+	lr0.03=>0.03/25 32epoch:	  NaN%	train loss:     NaN, val loss:     NaN @ 7th epoch
 	lr0.05=>0.05/25 8epoch:		  NaN%	train loss:     NaN, val loss:     NaN
 	lr0.04=>0.04/25 8epoch:		88.14%	train loss: 0.01200, val loss: 0.09322
 	lr0.03=>0.03/25 8epoch:		88.29%	train loss: 0.01228, val loss: 0.09533
