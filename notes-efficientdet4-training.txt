@@ -656,6 +656,37 @@ python fuse_obb.py VAID_det_gt_073_092_z0009_yolov5_obb VAID _relabeled\073\VAID
 		模型识别结果都不置信时，选用AABB IoU与标注label最大的结果做为合并结果，并标记为绿色
 			连一个AABB IoU > 0.3的结果都没有的话，就用原始AABB groundtruth结果，并标记为亮蓝色
 
+=================================================================================================================================================================
+yolov5_obb v6
+	data/hyps/obb/hyp.finetune_DroneVehicle.yaml
+	data/hyps/obb/hyp.finetune_dota.yaml
+	support single class training | ✔ | But it will get weaker results than **'nc=2'**
+
+
+Revision: 01f32c3f97f15a375676a1eaf882cafa9fc82025
+Author: Liang Ma <maliang@51hitech.com>
+Date: 8/30/2021 6:04:35 PM
+3. Store crop_size, bus_count, vehicle_motion to _meta.json file while dataset exporting, which could be used to further reduce redundancy in exported dataset.
+
+try to train yolov5_obb v6 @ 20221016
+python -u train.py --save-period 1 --weight "runs/yolov5m_finetune/weights/best.pt" --data "data/eagle003.yaml" --hyp "data/hyps/obb/hyp.finetune_eagle003.yaml" --img-size 768 --batch-size 1 --epochs 10 --device 0 --workers -1 2>&1 | tee 20221016_0047.log
+
+version 1.0.3 required by YOLOv5, but version 0.4.6 is currently installed
+
+data\eagle\0001_shijidadao_20200907_1202_200m_fixed_tiny\train\labelTxt
+  File "F:\ws\yolov5_obb\train.py", line 19, in <module>
+    import torch
+  File "C:\Anaconda3\envs\pytorch2022\lib\site-packages\torch\__init__.py", line 124, in <module>
+    import torch
+  File "C:\Anaconda3\envs\pytorch2022\lib\site-packages\torch\__init__.py", line 124, in <module>
+    import torch
+  File "C:\Anaconda3\envs\pytorch2022\lib\site-packages\torch\__init__.py", line 124, in <module>
+    raise err
+OSError: [WinError 1455] The paging file is too small for this operation to complete. Error loading "C:\Anaconda3\envs\pytorch2022\lib\site-packages\torch\lib\caffe2_detectron_ops_gpu.dll" or one of its dependencies.
+    raise err
+	switch to Linux
+
+=================================================================================================================================================================
 
 使用网络判断车辆是否完整
 使用网络回归车辆朝向
@@ -846,29 +877,31 @@ lr0.06=>0.06/100000 14epochs:
 
 lr0.056=>0.0056/25 1epoch:	85.92%
 lr0.056=>0.0056/25 4epochs:	87.12%
-lr0.056=>0.0056/25 8epoch:	87.54%
+lr0.056=>0.0056/25 8epochs:	87.54%
 lr0.056=>0.0056/25 12epoch:	87.93%
 lr0.056=>0.0056/25 16epoch:	88.18%
 lr0.056=>0.0056/25 20epoch:
 lr0.056=>0.0056/25 24epoch:
 lr0.056=>0.0056/25 28epoch:
-lr0.056=>0.0056/25 32epoch:
+lr0.056=>0.0056/25 32epoch:	WIP
 lr0.056=>0.0056/25 36epoch:
 lr0.056=>0.0056/25 40epoch:
 lr0.056=>0.0056/25 80epoch:
 
 batch size 8
-	lr0.01=>0.01/25 32epoch:
-	lr0.03=>0.03/25 32epoch:	  NaN%	train loss:     NaN, val loss:     NaN @ 7th epoch
-	lr0.05=>0.05/25 8epoch:		  NaN%	train loss:     NaN, val loss:     NaN
-	lr0.04=>0.04/25 8epoch:		88.14%	train loss: 0.01200, val loss: 0.09322
-	lr0.03=>0.03/25 8epoch:		88.29%	train loss: 0.01228, val loss: 0.09533
-	lr0.02=>0.02/25 8epoch:		88.18%	train loss: 0.01282, val loss: 0.09911
-	lr0.01=>0.01/25 8epoch:		87.94%	train loss: 0.01400, val loss: 0.10700
-	lr0.009=>0.009/25 8epoch:	87.91%	train loss: 0.01418, val loss: 0.10830
-	lr0.008=>0.008/25 8epoch:	87.84%	train loss: 0.01439, val loss: 0.10988
-	lr0.007=>0.007/25 8epoch:	87.75%	train loss: 0.01464, val loss: 0.11167
-	lr0.006=>0.006/25 8epoch:	87.67%  train loss: 0.01494, val loss: 0.11388
+
+	lr0.01=>0.01/25 32epoch:	88.30%  train loss: 0.01078, val loss: 0.08449
+	lr0.02=>0.02/25 32epoch:	NaN%	train loss:     NaN, val loss:     NaN @ 14th epoch
+	lr0.03=>0.03/25 32epoch:	NaN%	train loss:     NaN, val loss:     NaN @ 7th epoch
+	lr0.05=>0.05/25 8epochs:	NaN%	train loss:     NaN, val loss:     NaN
+	lr0.04=>0.04/25 8epochs:	88.14%	train loss: 0.01200, val loss: 0.09322
+	lr0.03=>0.03/25 8epochs:	88.29%	train loss: 0.01228, val loss: 0.09533
+	lr0.02=>0.02/25 8epochs:	88.18%	train loss: 0.01282, val loss: 0.09911
+	lr0.01=>0.01/25 8epochs:	87.94%	train loss: 0.01400, val loss: 0.10700
+	lr0.009=>0.009/25 8epochs:	87.91%	train loss: 0.01418, val loss: 0.10830
+	lr0.008=>0.008/25 8epochs:	87.84%	train loss: 0.01439, val loss: 0.10988
+	lr0.007=>0.007/25 8epochs:	87.75%	train loss: 0.01464, val loss: 0.11167
+	lr0.006=>0.006/25 8epochs:	87.67%  train loss: 0.01494, val loss: 0.11388
 
 
 https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.OneCycleLR.html
