@@ -687,6 +687,119 @@ OSError: [WinError 1455] The paging file is too small for this operation to comp
 	switch to Linux
 
 =================================================================================================================================================================
+try other obb detection framework
+
+2022 - MMRotate - A Rotated Object Detection Benchmark using PyTorch
+	compares ResNet50 and Swin-T in terms of memory, inference time
+	and mAP by plugging them in RoI Trans. It has been shown that
+	Swin-T significantly outperforms ResNet50, although its inference
+	speed is 21% slower than that of ResNet50
+
+	KLD loss achieved the best mAP in the OpenCV definition method when using RetinaNet as the baseline
+	However, when using the R3Det as the baseline, the KFIoU loss achieved the best mAP in the OpenCV definition method.
+
+	MMRotate support mixed precision training
+		the model trained with fp16 has a similar mAP as the original model
+
+	https://github.com/dingjiansw101/AerialDetection
+	https://github.com/jbwang1997/OBBDetection
+	https://github.com/Jittor/JDet
+	https://github.com/yangxue0827/RotationDetection
+	https://github.com/open-mmlab/mmrotate
+
+	https://github.com/ming71/OBBDet_Swin
+
+https://github.com/open-mmlab/mmrotate/blob/main/demo/huge_image_demo.py
+from mmrotate.apis import inference_detector_by_patches
+        '--patch_sizes',        help='The sizes of patches')
+        '--patch_steps',        help='The steps between two patches')
+        '--img_ratios',        help='Image resizing ratios for multi-scale detecting')
+        '--merge_iou_thr',        help='IoU threshould for merging results')
+
+https://github.com/open-mmlab/mmrotate/tree/main/tools/data/dota
+	Preparing DOTA Dataset
+	split dota dataset
+		1024×1024 patches with an overlap of 200
+			python tools/data/dota/split/img_split.py --base-json tools/data/dota/split/split_configs/ss_trainval.json
+
+
+
+2021 - The KFIoU Loss for Rotated Object Detection
+	Gaussian distribution
+		kalman filtering
+	loss
+		Angle difference case
+		Aspect ratio case
+		Center shifting case
+
+2021 - Rethinking Rotated Object Detection with Gaussian Wasserstein Distance Loss
+2022 - (VIP, high precision) Detecting Rotated Objects as Gaussian Distributions and Its 3-D Generalization.pdf
+	Existing detection methods commonly use a parameterized bounding box (BBox) to model and detect (horizontal) objects
+	and an additional rotation angle parameter is used for rotated objects.
+
+	We argue that such a mechanism has fundamental limitations in building an effective regression loss for rotation
+	detection, especially for high-precision detection with high IoU (e.g. 0.75)
+	
+	GWD/BCD/KLD still obtains improvement by 22.46%/32.82%/33.96% by AP75, and 9.89%/14.08%/15.22% by AP50:95
+
+=================================================================================================================================================================
+dataset exporting
+
+ROI-based
+
+
+Revision: b26b2011f324c6f4aaf1e37bc3a8b0075cbe6d26
+Author: Liang Ma <maliang@51hitech.com>
+Date: 5/28/2021 9:16:12 PM
+Message:
+1. Save cropping ROI as special video markers, which are AABB squared boxes.
+2. Use key P to set markers as cropping ROI
+3. Export Absolute OBB Patches from ROI with additional uniform noise on positions and cropping sizes.
+----
+Modified: CyTraffic/CyRenderHelper.cpp
+Modified: CyTraffic/Tracker/VideoMarker.cpp
+Modified: CyTraffic/Tracker/VideoMarker.h
+Modified: MyRenderer.cpp
+Modified: MyRendererUI.cpp
+
+
+Revision: 01f32c3f97f15a375676a1eaf882cafa9fc82025
+Author: Liang Ma <maliang@51hitech.com>
+Date: 8/30/2021 6:04:35 PM
+Message:
+1. Load google map tiles with kml files as background.
+2. Export vehicle types in batch_export_obb_patches().
+3. Store crop_size, bus_count, vehicle_motion to _meta.json file while dataset exporting, which could be used to further reduce redundancy in exported dataset.
+4. Add an option "All Types" to load all trajectories from CSV to base markers, used in changan001 project.
+5. Fix Focused mode UI for secondary OpenGL view.
+6. Fix vehicle height for the changan001 project.
+7. Temporarily disable ignore_ratio in batch_export_obb_patches().
+8. Update CyTraffic/data for new maps, trajectories and google map tiles.
+----
+Modified: CyTraffic/CyRenderHelper.cpp
+Modified: CyTraffic/Tracker/VideoMarker.cpp
+Modified: CyTraffic/Tracker/VideoMarker.h
+Modified: CyTraffic/data
+Modified: MyApplication.cpp
+Modified: MyRenderer.cpp
+Modified: MyRenderer.hpp
+Modified: MyRendererUI.cpp
+
+where is files with ROI markers???
+
+20210603 修复标注中的问题，导出训练图片
+20210608 训练yolov5 AABB private170 mAP87%
+efficientNet最后使用平均池化层，768*768池化前24*24，260*260池化前8*8，池化后都是1*1
+20210610 开始训练基于circular smooth label的obb检测，检测发现训练速度下降3倍，检测速度下降和车辆数目相关，4k单帧快的0.1秒，慢的0.8秒
+20210617 解决OBB检测NMS速度过慢问题
+20210623 yolov5 obb与deep sort结合，开始查找pipeline加速方案
+
+Q:\51515151515151515151\git-51-ws (520G)\CyTrafficEditor (490G)\Cybertron\Modules\Foundation\Source\CyTrafficEditor\CyTraffic\data\videos\20200901M2_20200903_1205_250m_fixed.vehicle_markers.json
+	last modified @ 20210602 !!!
+
+
+
+=================================================================================================================================================================
 
 使用网络判断车辆是否完整
 使用网络回归车辆朝向
@@ -883,7 +996,7 @@ lr0.056=>0.0056/25 16epoch:	88.18%
 lr0.056=>0.0056/25 20epoch:
 lr0.056=>0.0056/25 24epoch:
 lr0.056=>0.0056/25 28epoch:
-lr0.056=>0.0056/25 32epoch:	WIP
+lr0.056=>0.0056/25 32epoch:	88.01%
 lr0.056=>0.0056/25 36epoch:
 lr0.056=>0.0056/25 40epoch:
 lr0.056=>0.0056/25 80epoch:
@@ -902,6 +1015,13 @@ batch size 8
 	lr0.008=>0.008/25 8epochs:	87.84%	train loss: 0.01439, val loss: 0.10988
 	lr0.007=>0.007/25 8epochs:	87.75%	train loss: 0.01464, val loss: 0.11167
 	lr0.006=>0.006/25 8epochs:	87.67%  train loss: 0.01494, val loss: 0.11388
+
+SGD + large lr + OnCycleLR
+	leads to overfit ?
+		eg: train loss: 0.01078, val loss: 0.08449
+			try AdamW with weight decay
+
+
 
 
 https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.OneCycleLR.html
