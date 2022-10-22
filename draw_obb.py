@@ -35,7 +35,7 @@ def run(image_folder, marker_folder):
             if "enabled" in obj and not obj["enabled"]:
                 continue
             if 1:
-                certainty = obj["certainty"]
+                certainty = obj["certainty"] if "certainty" in obj else 1.0
                 confidence = obj["score"]
             else: # for gt
                 certainty = 1.0

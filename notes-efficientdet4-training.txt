@@ -356,7 +356,7 @@ OBB mAPs:
 
 private 170 with vehicle types
 model-z0009-054epoch
-                 AP    TP    FP   DET
+                 AP    TP    FP    GT
        car: 100.00%  2555    15  2555
        bus: 100.00%    69     0    69
  big_truck:  97.55%   169     6   173
