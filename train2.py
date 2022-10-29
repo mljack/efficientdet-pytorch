@@ -359,8 +359,8 @@ class Fitter:
         #    {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         #] 
 
-        #self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.lr)
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=config.lr, momentum=0.9)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.lr)
+        #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=config.lr, momentum=0.9)
         self.scheduler = config.SchedulerClass(self.optimizer, **config.scheduler_params)
         self.logger.log(f'Fitter prepared. Device is {self.device}')
 
@@ -538,12 +538,12 @@ class Fitter:
 
 class TrainGlobalConfig:
     num_workers = 4
-    batch_size = 4
-    n_epochs = 4
+    batch_size = 8
+    n_epochs = 32
     samples_per_virtual_epoch = 10000
     #lr = 0.01
     #lr = 0.001
-    lr = 0.0056
+    lr = 0.001
     div_factor = 25
     #lr = 0.00001
     #lr = 0.00003
